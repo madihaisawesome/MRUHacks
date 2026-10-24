@@ -1,0 +1,61 @@
+{
+  "skill": "Sew on a button",
+  "persona": "a warm, patient grandparent teaching a young person",
+  "steps": [
+    {
+      "id": 1,
+      "title": "Thread the needle",
+      "instruction": "Thread about 60cm of thread through the needle and knot the end.",
+      "success_criteria": "A needle with thread through the eye is visible, and a knot is visible at the tail end.",
+      "common_mistakes": [
+        "thread not through the eye",
+        "no knot",
+        "thread far too short"
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Position the button",
+      "instruction": "Place the button where you want it on the fabric and hold it securely.",
+      "success_criteria": "The button is positioned flat against the fabric in the intended spot and is being held securely.",
+      "common_mistakes": [
+        "button is crooked",
+        "button is not on the fabric",
+        "button is not held securely"
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Make the first stitch",
+      "instruction": "Push the needle up through the fabric beside a button hole, then down through the hole.",
+      "success_criteria": "The thread passes up through the fabric and down through one button hole, with the button still in position.",
+      "common_mistakes": [
+        "needle starts on top of the fabric",
+        "thread misses the button hole",
+        "button moves out of position"
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Sew through both holes",
+      "instruction": "Repeat the stitch through each button hole at least four times so the button is firmly attached.",
+      "success_criteria": "Several neat stitches are visible through both button holes, and the button is attached firmly to the fabric.",
+      "common_mistakes": [
+        "too few stitches",
+        "stitches do not pass through both holes",
+        "thread is loose"
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Tie off the thread",
+      "instruction": "Make two small stitches on the back of the fabric and tie a secure knot before trimming the thread.",
+      "success_criteria": "A secure knot is visible on the back of the fabric and the remaining thread is neatly trimmed.",
+      "common_mistakes": [
+        "no knot",
+        "knot is loose",
+        "thread is left very long"
+      ]
+    }
+  ]
+}
