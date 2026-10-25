@@ -16,7 +16,7 @@ export default function LibraryScreen() {
       {guides.length === 0 && (
         <Panel>
           <p className="meta">
-            No skills shared yet. Be the first to preserve a skill!
+            No skills acquired yet. Go to explore to find one!
           </p>
         </Panel>
       )}
