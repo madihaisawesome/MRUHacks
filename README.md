@@ -43,6 +43,16 @@ curl.exe -X POST http://localhost:3001/generate-lesson `
   -d "{\"text\":\"Mix flour and water, rest 20 minutes, roll flat, cook in a dry pan.\",\"preservedBy\":{\"name\":\"Grandma\",\"story\":\"Sunday flatbread\"}}"
 ```
 
+Ask the LangGraph create-skill phase to invent a new lesson (then start it with the returned `lessonId`):
+
+```powershell
+curl.exe -X POST http://localhost:3001/create-skill `
+  -H "Content-Type: application/json" `
+  -d "{\"message\":\"Teach me how to braid hair\"}"
+```
+
+If it returns `"status":"needs_input"`, send a follow-up with the same `conversationId`.
+
 Start a session (default lesson is `sew-button`, or pass a `lessonId`):
 
 ```powershell

@@ -9,12 +9,11 @@ import dotenv from "dotenv";
 import express from "express";
 
 import { sessions } from "./sessions.js";
+import { runCreateSkillGraph } from "./createSkillGraph.js";
+import { generateAndSaveLesson } from "./generateLesson.js";
 import {
   getLesson,
   listLessonSummaries,
-  mockGeneratedLesson,
-  normalizeGeneratedLesson,
-  saveLesson,
 } from "./lessons.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -272,38 +271,6 @@ app.get("/lessons/:id", (req, res) => {
   res.json(lesson);
 });
 
-function generateLessonPrompt(text, category) {
-  return [
-    "You are a skill-teaching curriculum designer.",
-    "Read the person's instructions. Transcribe handwriting if an image is provided.",
-    "Stay faithful to their method. Do not invent a different technique or add steps they did not describe, other than splitting a described step into smaller ones.",
-    text ? `Typed or transcribed instructions from the person:\n${text}` : "No typed text was provided; rely on the image.",
-    category ? `Preferred category if it fits: ${category}` : "",
-    "Produce 4 to 8 steps. Each step needs:",
-    "- a short title",
-    "- a one-to-two sentence instruction in plain beginner-friendly language",
-    "- concrete success_criteria describing what a webcam frame would visibly show when the step is done correctly",
-    "- 2 to 3 common_mistakes",
-    'Set "verifiable": false for any step a camera cannot reasonably confirm (taste, smell, waiting time, temperature). For those steps, success_criteria should describe what the user should self-confirm.',
-    "Also suggest skill (title), category, difficulty (beginner|intermediate|advanced), estimatedMinutes, and a materials list.",
-    "If the content is unsafe to teach as a casual activity (hazardous chemicals, mains electrical work, or firearms), return ONLY {\"refused\": true, \"reason\": \"...\"}.",
-    "Return ONLY valid JSON with no preamble and no markdown fences, matching this shape (without id, createdAt, or persona):",
-    '{"skill":"...","category":"...","difficulty":"beginner","estimatedMinutes":10,"materials":["..."],"steps":[{"title":"...","instruction":"...","success_criteria":"...","common_mistakes":["...","..."],"verifiable":true}]}',
-  ].filter(Boolean).join("\n");
-}
-
-function parseJsonFence(response) {
-  const text = response.content?.find((block) => block.type === "text")?.text;
-  if (!text) throw new Error("The model returned no text.");
-  const cleaned = text
-    .trim()
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
-  return JSON.parse(cleaned);
-}
-
 app.post("/generate-lesson", async (req, res) => {
   const { image, text, preservedBy, category } = req.body || {};
   const hasImage = typeof image === "string" && image.trim();
@@ -313,54 +280,43 @@ app.post("/generate-lesson", async (req, res) => {
   }
 
   try {
-    if (process.env.MOCK_MODE === "true") {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      const lesson = mockGeneratedLesson();
-      if (preservedBy && typeof preservedBy === "object") {
-        lesson.preservedBy = {
-          name: String(preservedBy.name || "").slice(0, 80),
-          story: String(preservedBy.story || "").slice(0, 400),
-        };
-      }
-      if (category) lesson.category = String(category).slice(0, 80);
-      return res.json(saveLesson(lesson));
-    }
-
-    if (!anthropic) throw new Error("ANTHROPIC_API_KEY is not configured.");
-    const content = [];
-    if (hasImage) {
-      content.push({
-        type: "image",
-        source: { type: "base64", media_type: "image/jpeg", data: image.trim() },
-      });
-    }
-    content.push({ type: "text", text: generateLessonPrompt(hasText ? text.trim() : "", category) });
-
-    let lastError;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        const response = await anthropic.messages.create({
-          model: "claude-sonnet-5-5",
-          max_tokens: 2000,
-          messages: [{ role: "user", content }],
-        });
-        const parsed = parseJsonFence(response);
-        const lesson = normalizeGeneratedLesson(parsed, { preservedBy, category });
-        return res.json(saveLesson(lesson));
-      } catch (error) {
-        if (error.refused) {
-          return res.status(422).json({ refused: true, reason: error.reason });
-        }
-        lastError = error;
-      }
-    }
-    return res.status(500).json({ error: lastError?.message || "Unable to generate a lesson." });
+    const lesson = await generateAndSaveLesson({
+      image,
+      text,
+      preservedBy,
+      category,
+      anthropic,
+    });
+    return res.json(lesson);
   } catch (error) {
     if (error.refused) {
       return res.status(422).json({ refused: true, reason: error.reason });
     }
     console.error("Lesson generation failed:", error);
-    return res.status(500).json({ error: error.message || "Unable to generate a lesson." });
+    const status = error.message === "image or text is required" ? 400 : 500;
+    return res.status(status).json({ error: error.message || "Unable to generate a lesson." });
+  }
+});
+
+app.post("/create-skill", async (req, res) => {
+  const { message, image, preservedBy, category, conversationId } = req.body || {};
+  if (typeof message !== "string" || !message.trim()) {
+    return res.status(400).json({ error: "message is required" });
+  }
+  try {
+    const result = await runCreateSkillGraph({
+      message: message.trim(),
+      image,
+      preservedBy,
+      category,
+      conversationId,
+      anthropic,
+    });
+    const status = result.status === "refused" ? 422 : result.status === "error" ? 500 : 200;
+    return res.status(status).json(result);
+  } catch (error) {
+    console.error("Create-skill graph failed:", error);
+    return res.status(500).json({ error: error.message || "create-skill graph failed" });
   }
 });
 
