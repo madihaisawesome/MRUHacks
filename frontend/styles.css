@@ -631,52 +631,6 @@ select:focus-visible {
   font-size: 48px;
 }
 
-/* Skills List */
-
-.treeRow {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.treeNodes {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0;
-}
-
-.node {
-  width: 43px;
-  height: 43px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #e8d4a5;
-  border: 3px solid #b49a6a;
-}
-
-.nodeOpen {
-  background: var(--card-light);
-  border-color: var(--grass);
-}
-
-.nodeDone {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 2px var(--grass);
-}
-
-.treeLink {
-  width: 12px;
-  height: 4px;
-  background: var(--track);
-}
-
-.treeLinkOpen {
-  background: var(--grass);
-}
-
 /* Community Library */
 
 .guide {
