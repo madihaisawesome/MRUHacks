@@ -26,6 +26,7 @@ const app = express();
 const port = Number(process.env.PORT || 3001);
 const rateLimitTimes = new Map();
 const mockChecks = new Map();
+const mockFinalChecks = new Map();
 
 app.use(cors());
 app.use(express.json({ limit: "15mb" }));
@@ -208,6 +209,7 @@ function createSession(lesson) {
     passStreak: 0,
     history: [],
     completed: false,
+    verified: false,
   });
   return sessionId;
 }
@@ -220,6 +222,73 @@ function resetSessionState(session, lesson) {
   session.passStreak = 0;
   session.history = [];
   session.completed = false;
+  session.verified = false;
+}
+
+function finalVerifyPrompt(lesson) {
+  const flaws = Array.isArray(lesson.final_common_flaws)
+    ? lesson.final_common_flaws.join(", ")
+    : "";
+  return [
+    "You are checking a learner's finished result photo for a skill lesson.",
+    `Skill: ${lesson.skill}`,
+    `Final success criteria: ${lesson.final_success_criteria || "The finished result looks complete and neat."}`,
+    `Common flaws: ${flaws || "unfinished work, wrong subject, messy result"}`,
+    "",
+    "Decide whether the finished result clearly matches the final success criteria.",
+    "If the image is too dark, blurry, or shows the wrong subject, set visible false and explain what to fix.",
+    "If visible and the result passes, set passed true and score 70-100 with brief warm feedback.",
+    "If visible but it fails, set passed false, score 0-69, and name the main flaw to fix.",
+    "score must be an integer from 0 to 100.",
+    "Return ONLY valid JSON with no preamble and no markdown fences:",
+    '{"visible": true, "passed": true|false, "feedback": "...", "score": 0}',
+  ].join("\n");
+}
+
+async function assessFinalImage(image, lesson, sessionId) {
+  if (llmProvider() === "mock") {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const count = (mockFinalChecks.get(sessionId) || 0) + 1;
+    mockFinalChecks.set(sessionId, count);
+    const passed = count % 2 === 0;
+    return {
+      visible: true,
+      passed,
+      feedback: passed
+        ? `Beautiful — that finished ${lesson.skill.toLowerCase()} looks complete.`
+        : `Not quite the finished look yet. ${lesson.final_success_criteria || "Show the completed result clearly."}`,
+      score: passed ? 88 : 42,
+    };
+  }
+
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const result = await completeJson({
+        prompt: finalVerifyPrompt(lesson),
+        image,
+        maxTokens: 600,
+      });
+      if (
+        typeof result.visible !== "boolean" ||
+        typeof result.passed !== "boolean" ||
+        typeof result.feedback !== "string" ||
+        !Number.isFinite(Number(result.score))
+      ) {
+        throw new Error("The model returned an invalid final assessment.");
+      }
+      const score = Math.max(0, Math.min(100, Math.round(Number(result.score))));
+      return {
+        visible: result.visible,
+        passed: result.passed,
+        feedback: result.feedback,
+        score,
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw new Error(`Unable to parse the final assessment: ${lastError.message}`);
 }
 
 function selfConfirmFeedback(step) {
@@ -311,6 +380,7 @@ app.post("/session/reset", (req, res) => {
   resetSessionState(session, lesson);
   rateLimitTimes.delete(sessionId);
   mockChecks.delete(sessionId);
+  mockFinalChecks.delete(sessionId);
   res.json(startSessionPayload(sessionId, lessonAsSkill(lesson)));
 });
 
@@ -371,7 +441,7 @@ app.post("/check", async (req, res) => {
     });
 
     if (!assessment.visible) {
-      return res.json(sessionResponse(session, assessment.feedback));
+      return res.json(sessionResponse(session, assessment.feedback, { visible: false }));
     }
 
     if (assessment.criteria_met) {
@@ -402,6 +472,78 @@ app.post("/check", async (req, res) => {
     return res.status(500).json({ error: error.message || "image check failed" });
   } finally {
     console.log(`/check latency: ${Date.now() - startedAt}ms`);
+  }
+});
+
+app.post("/verify-final", async (req, res) => {
+  const startedAt = Date.now();
+  const { sessionId, image } = req.body || {};
+  try {
+    const session = sessions.get(sessionId);
+    if (!session) return res.status(404).json({ error: "session not found" });
+    const lesson = getSessionLesson(session);
+    if (!lesson) return res.status(404).json({ error: "lesson not found" });
+    if (typeof image !== "string" || !image) {
+      return res.status(400).json({ error: "image is required" });
+    }
+    if (!session.completed) {
+      return res.status(400).json({ error: "finish all lesson steps before final verification" });
+    }
+    const previousCheck = rateLimitTimes.get(sessionId);
+    if (previousCheck && Date.now() - previousCheck < 2000) {
+      return res.status(429).json({ error: "too fast" });
+    }
+    rateLimitTimes.set(sessionId, Date.now());
+
+    if (session.verified) {
+      return res.json({
+        passed: true,
+        feedback: "This lesson is already verified. Nice work!",
+        score: 100,
+        badge: true,
+      });
+    }
+
+    const assessment = await assessFinalImage(image, lesson, sessionId);
+    if (!assessment.visible) {
+      return res.json({
+        passed: false,
+        feedback: assessment.feedback,
+        score: assessment.score,
+        badge: false,
+        visible: false,
+      });
+    }
+
+    session.history.push({
+      step: "final",
+      feedback: assessment.feedback,
+      passed: assessment.passed,
+      score: assessment.score,
+      ts: new Date().toISOString(),
+    });
+
+    if (assessment.passed) {
+      session.verified = true;
+      return res.json({
+        passed: true,
+        feedback: assessment.feedback,
+        score: assessment.score,
+        badge: true,
+      });
+    }
+
+    return res.json({
+      passed: false,
+      feedback: assessment.feedback,
+      score: assessment.score,
+      badge: false,
+    });
+  } catch (error) {
+    console.error("Final verification failed:", error);
+    return res.status(500).json({ error: error.message || "final verification failed" });
+  } finally {
+    console.log(`/verify-final latency: ${Date.now() - startedAt}ms`);
   }
 });
 

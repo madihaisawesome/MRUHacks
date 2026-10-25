@@ -1,116 +1,227 @@
-import { useState, useCallback, useEffect } from 'react';
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+} from 'react';
 import { useProgress } from '../context/ProgressContext';
 import { Button, Panel } from '../components/UI';
-import TaskVerification from '../components/TaskVerification';
-
-const API_URL = (
-  import.meta.env.VITE_API_URL || 'http://localhost:3001'
-).replace(/\/$/, '');
+import WebcamPanel, { fingerprintsDiffer } from '../components/WebcamPanel';
+import {
+  checkFrame,
+  confirmStep,
+  getLesson,
+  lessonIdForSkill,
+  startSession,
+  verifyFinal,
+} from '../api';
 
 export default function LessonScreen({ skill, onBack }) {
+  const webcamRef = useRef(null);
+  const checkingRef = useRef(false);
+  const lastFingerprintRef = useRef(null);
+  const stepAnimRef = useRef(null);
+
+  const [sessionId, setSessionId] = useState('');
   const [steps, setSteps] = useState([]);
   const [materials, setMaterials] = useState(skill.materials || []);
-  const [stepIndex, setStepIndex] = useState(0);
+  const [currentStep, setCurrentStep] = useState(null);
+  const [totalSteps, setTotalSteps] = useState(0);
+  const [lessonComplete, setLessonComplete] = useState(false);
+  const [phase, setPhase] = useState('steps'); // steps | final | badge
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [verified, setVerified] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
-  const [completing, setCompleting] = useState(false);
-  const [completionError, setCompletionError] = useState('');
+
+  const [watching, setWatching] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const [passStreak, setPassStreak] = useState(0);
+  const [showHint, setShowHint] = useState(false);
+  const [needsSelfConfirm, setNeedsSelfConfirm] = useState(false);
+  const [visibleIssue, setVisibleIssue] = useState(false);
+  const [stepFlash, setStepFlash] = useState(false);
+  const [autoCheck, setAutoCheck] = useState(false);
+
+  const [finalWatching, setFinalWatching] = useState(false);
+  const [finalFeedback, setFinalFeedback] = useState('');
+  const [finalScore, setFinalScore] = useState(null);
+  const [finalPassed, setFinalPassed] = useState(false);
+  const [badgeEarned, setBadgeEarned] = useState(false);
 
   const { complete, done } = useProgress();
+  const alreadyDone = done.includes(skill.id);
 
   const loadLesson = useCallback(async () => {
     setLoading(true);
     setError('');
-    setSteps([]);
-    setStepIndex(0);
-    setVerified(false);
-    setCompletionError('');
+    setFeedback('');
+    setPassStreak(0);
+    setShowHint(false);
+    setNeedsSelfConfirm(false);
+    setVisibleIssue(false);
+    setLessonComplete(false);
+    setPhase('steps');
+    setFinalFeedback('');
+    setFinalScore(null);
+    setFinalPassed(false);
+    setBadgeEarned(false);
+    lastFingerprintRef.current = null;
 
     try {
-      const response = await fetch(`${API_URL}/generate-lesson`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: skill.title,
-          category: skill.cat,
-        }),
-      });
+      const id = lessonIdForSkill(skill);
+      const lesson = await getLesson(id);
+      const session = await startSession(lesson.id);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error || 'Could not generate the lesson.'
-        );
-      }
-
-      const lesson = data.lesson || data;
-
-      const generatedSteps = (lesson.steps || []).map((item) => ({
-        t: item.t || item.title || '',
-        d:
-          item.d ||
-          item.instruction ||
-          item.description ||
-          '',
-      }));
-
-      if (!generatedSteps.length) {
-        throw new Error('The AI did not return any lesson steps.');
-      }
-
-      setSteps(generatedSteps);
+      setSessionId(session.sessionId);
+      setSteps(lesson.steps || []);
       setMaterials(lesson.materials || skill.materials || []);
+      setTotalSteps(session.totalSteps || lesson.steps?.length || 0);
+      setCurrentStep(session.step || lesson.steps?.[0] || null);
+      setLessonComplete(Boolean(session.completed));
+      if (session.completed) setPhase('final');
     } catch (err) {
-      setError(
-        err.message || 'Could not load the lesson. Please try again.'
-      );
+      setError(err.message || 'Could not start the lesson.');
     } finally {
       setLoading(false);
     }
-  }, [skill.id, skill.title, skill.cat, skill.level, skill.materials]);
+  }, [skill]);
 
   useEffect(() => {
     loadLesson();
   }, [loadLesson, retryKey]);
 
-  const step = steps[stepIndex];
-  const last = steps.length > 0 && stepIndex === steps.length - 1;
-  const alreadyDone = done.includes(skill.id);
+  function applyCheckResponse(data) {
+    if (data.tooFast) return;
 
-  async function handleVerified() {
-    if (alreadyDone || completing) return;
+    setFeedback(data.coachLine || data.feedback || '');
+    setPassStreak(Number(data.passStreak) || 0);
+    setShowHint(Boolean(data.hint));
+    setNeedsSelfConfirm(Boolean(data.needsSelfConfirm));
+    setVisibleIssue(data.visible === false);
 
-    setCompleting(true);
-    setCompletionError('');
+    if (data.currentStep) {
+      setCurrentStep(data.currentStep);
+    }
 
-    try {
-      await complete(skill.id);
-      setVerified(true);
-    } catch {
-      setCompletionError(
-        'The task was verified, but progress could not be saved. Please try again.'
-      );
-    } finally {
-      setCompleting(false);
+    if (data.advanced) {
+      setStepFlash(true);
+      clearTimeout(stepAnimRef.current);
+      stepAnimRef.current = setTimeout(() => setStepFlash(false), 700);
+      setPassStreak(0);
+      setShowHint(false);
+      setNeedsSelfConfirm(false);
+    }
+
+    if (data.completed) {
+      setLessonComplete(true);
+      setPhase('final');
+      setNeedsSelfConfirm(false);
     }
   }
 
+  async function runCheck({ quiet429 = false } = {}) {
+    if (!sessionId || checkingRef.current || lessonComplete || phase !== 'steps') {
+      return;
+    }
+
+    checkingRef.current = true;
+    setWatching(true);
+    setVisibleIssue(false);
+
+    try {
+      const image = await webcamRef.current.captureJpegBase64();
+      const data = await checkFrame(sessionId, image, { quiet429 });
+      applyCheckResponse(data);
+      lastFingerprintRef.current = webcamRef.current.getFingerprint?.() || null;
+    } catch (err) {
+      if (!quiet429) {
+        setFeedback(err.message || 'Check failed. Try again.');
+      }
+    } finally {
+      checkingRef.current = false;
+      setWatching(false);
+    }
+  }
+
+  async function runConfirm() {
+    if (!sessionId || checkingRef.current) return;
+    checkingRef.current = true;
+    setWatching(true);
+    try {
+      const data = await confirmStep(sessionId);
+      applyCheckResponse(data);
+    } catch (err) {
+      setFeedback(err.message || 'Could not confirm that step.');
+    } finally {
+      checkingRef.current = false;
+      setWatching(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!autoCheck || phase !== 'steps' || lessonComplete || needsSelfConfirm) {
+      return undefined;
+    }
+
+    const timer = setInterval(async () => {
+      if (checkingRef.current) return;
+      const next = webcamRef.current?.getFingerprint?.() || null;
+      const prev = lastFingerprintRef.current;
+      if (next && prev && !fingerprintsDiffer(prev, next)) {
+        return;
+      }
+      await runCheck({ quiet429: true });
+    }, 5000);
+
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCheck, phase, lessonComplete, needsSelfConfirm, sessionId]);
+
+  async function runFinalVerify() {
+    if (!sessionId || checkingRef.current || badgeEarned) return;
+    checkingRef.current = true;
+    setFinalWatching(true);
+    setFinalFeedback('');
+
+    try {
+      const image = await webcamRef.current.captureJpegBase64();
+      const data = await verifyFinal(sessionId, image);
+      if (data.tooFast) return;
+
+      setFinalScore(data.score ?? null);
+      setFinalFeedback(data.feedback || '');
+      setFinalPassed(Boolean(data.passed));
+
+      if (data.passed && data.badge) {
+        setBadgeEarned(true);
+        setPhase('badge');
+        if (!alreadyDone) {
+          try {
+            await complete(skill.id);
+          } catch {
+            /* progress save is best-effort */
+          }
+        }
+      }
+    } catch (err) {
+      setFinalPassed(false);
+      setFinalFeedback(err.message || 'Final check failed. Try again.');
+    } finally {
+      checkingRef.current = false;
+      setFinalWatching(false);
+    }
+  }
+
+  const stepNumber = currentStep?.id || 1;
+  const progressLabel = `Step ${stepNumber} / ${totalSteps || steps.length || '?'}`;
+
   return (
-    <Panel>
+    <Panel className="lessonScreen">
       <div className="rowBetween">
-        <button
-          type="button"
-          className="backButton"
-          onClick={onBack}
-        >
+        <button type="button" className="backButton" onClick={onBack}>
           ← Back
         </button>
-
         <span className="tag">{skill.level}</span>
       </div>
 
@@ -120,109 +231,130 @@ export default function LessonScreen({ skill, onBack }) {
 
       {loading ? (
         <div className="loadingContainer">
-          <div className="latestIcon" aria-hidden="true">
-            ⏳
-          </div>
-          <p className="meta">Generating your lesson...</p>
+          <div className="latestIcon" aria-hidden="true">⏳</div>
+          <p className="meta">Starting your coaching session...</p>
         </div>
       ) : error ? (
         <>
-          <p className="errorText" role="alert">
-            {error}
-          </p>
-
-          <Button
-            title="Try Again"
-            onPress={() => setRetryKey((n) => n + 1)}
-          />
+          <p className="errorText" role="alert">{error}</p>
+          <Button title="Try Again" onPress={() => setRetryKey((n) => n + 1)} />
         </>
-      ) : (
-        <>
-          <h3 className="subTitle">Materials</h3>
-
-          <div className="materials">
-            {materials.map((material, index) => (
-              <span
-                className="material"
-                key={`${material}-${index}`}
-              >
-                {material}
-              </span>
-            ))}
-          </div>
-
+      ) : phase === 'badge' || (badgeEarned && finalPassed) ? (
+        <div className="reward lessonBadge">
+          <div className="rewardIcon">🏅</div>
+          <h3 className="subTitle">Badge earned!</h3>
           <p className="meta">
-            Step {stepIndex + 1} / {steps.length}
+            {finalFeedback || 'Your finished result passed the final check.'}
           </p>
-
-          <h3 className="subTitle">{step?.t}</h3>
-          <p className="stepText">{step?.d}</p>
-
-          {!last ? (
+          {finalScore != null && (
+            <p className="scorePill">Score: {finalScore}</p>
+          )}
+          <p className="meta">+50 XP saved to your progress.</p>
+          <Button title="Done" variant="green" onPress={onBack} />
+        </div>
+      ) : phase === 'final' ? (
+        <div className="lessonLayout">
+          <div className="lessonCopy">
+            <h3 className="subTitle">Final result check</h3>
+            <p className="stepText">
+              Show the finished result clearly — use the webcam or upload a photo.
+            </p>
+            {finalFeedback && (
+              <div
+                className={`feedbackBox ${finalPassed ? 'feedbackOk' : 'feedbackBad'}`}
+              >
+                {finalFeedback}
+              </div>
+            )}
+            {finalScore != null && !finalPassed && (
+              <p className="meta">Score: {finalScore} — try another photo.</p>
+            )}
             <div className="buttonRow">
               <Button
-                title="← Previous"
-                disabled={stepIndex === 0}
-                onPress={() =>
-                  setStepIndex((n) => Math.max(0, n - 1))
-                }
-              />
-
-              <Button
-                title="Next →"
-                onPress={() =>
-                  setStepIndex((n) =>
-                    Math.min(steps.length - 1, n + 1)
-                  )
-                }
+                title={finalWatching ? 'Watching...' : 'Verify final result'}
+                variant="green"
+                disabled={finalWatching}
+                onPress={runFinalVerify}
               />
             </div>
-          ) : (
-            <>
-              <TaskVerification
-                key={skill.id}
-                taskName={skill.title}
-                taskDescription={steps
-                  .map(
-                    (item, index) =>
-                      `${index + 1}. ${item.t}: ${item.d}`
-                  )
-                  .join('\n')}
-                onVerified={handleVerified}
-                disabled={alreadyDone || verified || completing}
-              />
-
-              {completing && (
-                <p className="meta">Saving your progress...</p>
-              )}
-
-              {completionError && (
-                <p className="errorText" role="alert">
-                  {completionError}
-                </p>
-              )}
-
-              {(verified || alreadyDone) && (
-                <div className="reward">
-                  <div className="rewardIcon">🎉</div>
-                  <h3 className="subTitle">
-                    Skill completed! +50 XP
-                  </h3>
-                  <p className="meta">
-                    Great work learning a practical skill.
-                  </p>
+          </div>
+          <WebcamPanel ref={webcamRef} disabled={finalWatching} />
+        </div>
+      ) : (
+        <div className={`lessonLayout ${stepFlash ? 'lessonAdvance' : ''}`}>
+          <div className="lessonCopy">
+            {materials?.length > 0 && (
+              <>
+                <h3 className="subTitle">Materials</h3>
+                <div className="materials">
+                  {materials.map((material, index) => (
+                    <span className="material" key={`${material}-${index}`}>
+                      {material}
+                    </span>
+                  ))}
                 </div>
-              )}
+              </>
+            )}
 
-              <Button
-                title="← Previous"
-                onPress={() =>
-                  setStepIndex((n) => Math.max(0, n - 1))
-                }
+            <p className="meta">{progressLabel}</p>
+            <h3 className={`subTitle ${stepFlash ? 'stepTitleFlash' : ''}`}>
+              {currentStep?.title || 'Current step'}
+            </h3>
+            <p className="stepText">{currentStep?.instruction}</p>
+
+            {passStreak === 1 && (
+              <p className="streakNote">
+                Looks good, hold on for one more check
+              </p>
+            )}
+
+            {visibleIssue && (
+              <p className="errorText" role="alert">
+                I can&apos;t see your work clearly — adjust the camera or lighting
+                and try again.
+              </p>
+            )}
+
+            {feedback && (
+              <div
+                className={`feedbackBox ${showHint ? 'feedbackHint' : ''}`}
+              >
+                {showHint && <strong className="hintLabel">Hint: </strong>}
+                {feedback}
+              </div>
+            )}
+
+            <label className="autoCheckToggle">
+              <input
+                type="checkbox"
+                checked={autoCheck}
+                onChange={(event) => setAutoCheck(event.target.checked)}
+                disabled={watching || needsSelfConfirm}
               />
-            </>
-          )}
-        </>
+              Auto-check every 5 seconds
+            </label>
+
+            <div className="buttonRow">
+              {needsSelfConfirm ? (
+                <Button
+                  title={watching ? 'Watching...' : 'I did this'}
+                  variant="green"
+                  disabled={watching}
+                  onPress={runConfirm}
+                />
+              ) : (
+                <Button
+                  title={watching ? 'Watching...' : 'Check my work'}
+                  variant="green"
+                  disabled={watching}
+                  onPress={() => runCheck({ quiet429: false })}
+                />
+              )}
+            </div>
+          </div>
+
+          <WebcamPanel ref={webcamRef} disabled={watching} />
+        </div>
       )}
     </Panel>
   );

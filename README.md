@@ -121,6 +121,7 @@ Base URL: `http://localhost:3001`
 | `POST` | `/session/reset` | Reset / switch lesson |
 | `POST` | `/session/confirm` | Advance a non-camera step (`verifiable: false`) |
 | `POST` | `/check` | Assess a webcam JPEG for the current step |
+| `POST` | `/verify-final` | After all steps are done, score a finished-result photo |
 
 Sessions are **in memory** — restarting the server clears active sessions. Generated lessons persist in `server/lessons.json`.
 
@@ -164,6 +165,11 @@ curl.exe -X POST http://localhost:3001/session/confirm `
 curl.exe -X POST http://localhost:3001/check `
   -H "Content-Type: application/json" `
   -d "{\"sessionId\":\"SESSION_ID\",\"image\":\"BASE64_JPEG\"}"
+
+# Final result photo (only after the session has completed every step)
+curl.exe -X POST http://localhost:3001/verify-final `
+  -H "Content-Type: application/json" `
+  -d "{\"sessionId\":\"SESSION_ID\",\"image\":\"BASE64_JPEG\"}"
 ```
 
 If `/create-skill` returns `"status":"needs_input"`, send another message with the same `conversationId`.
@@ -179,7 +185,7 @@ MOCK_MODE=true
 PORT=3001
 ```
 
-- `/check` alternates fail / pass (~1.5s)
+- `/check` and `/verify-final` alternate fail / pass (~1.5s)
 - `/generate-lesson` and `/create-skill` still produce real lessons in the library without calling OpenAI
 
 ## Notes for the frontend team

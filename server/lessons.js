@@ -25,6 +25,122 @@ const SEED_MATERIALS = {
   "organize-tools": ["tools", "toolbox or pegboard", "labels"],
 };
 
+const SEED_FINAL = {
+  "sew-button": {
+    final_success_criteria:
+      "A button sits flat on the fabric, firmly attached through its holes with neat stitches, and the thread is tied off with no long loose tail.",
+    final_common_flaws: [
+      "button is crooked or hanging by a loose thread",
+      "stitches miss the button holes",
+      "long untrimmed thread still dangling",
+    ],
+  },
+  "knot-a-tie": {
+    final_success_criteria:
+      "A neat knot sits centered at the collar, the wide blade hangs straight covering the narrow end, and the tip reaches near the belt line.",
+    final_common_flaws: [
+      "knot is loose, crooked, or sits too low",
+      "narrow end shows below the wide blade",
+      "tie is twisted or backwards",
+    ],
+  },
+  "fix-cabinet-handle": {
+    final_success_criteria:
+      "The handle sits flush and straight on the door or drawer, both screws are snug from the inside, and the handle does not wiggle when touched.",
+    final_common_flaws: [
+      "handle is crooked",
+      "one screw is missing or still loose",
+      "handle pulls away from the surface",
+    ],
+  },
+  "replace-car-tire": {
+    final_success_criteria:
+      "The spare is mounted on the hub, the car is fully lowered, all lug nuts are installed and snug, and the jack is no longer holding the vehicle.",
+    final_common_flaws: [
+      "car is still jacked up",
+      "lug nuts are missing or only finger-tight",
+      "spare is not fully seated on the studs",
+    ],
+  },
+  "grow-herbs": {
+    final_success_criteria:
+      "A pot with drainage holds potting mix and a planted herb or covered seeds, the soil looks lightly moist, and the pot sits in a bright spot.",
+    final_common_flaws: [
+      "roots or seeds still exposed",
+      "soil is bone dry or waterlogged",
+      "pot has no drainage or sits in deep standing water",
+    ],
+  },
+  compost: {
+    final_success_criteria:
+      "The compost bin shows layered browns and greens that look lightly damp and mixed or covered, with no obvious meat, dairy, or plastic.",
+    final_common_flaws: [
+      "only food scraps with no brown layer",
+      "pile is bone dry or dripping wet",
+      "plastic, meat, or dairy is visible in the pile",
+    ],
+  },
+  "bake-bread": {
+    final_success_criteria:
+      "A shaped loaf sits in a pan or on a tray looking risen and ready (or freshly baked with a set crust), not a raw shaggy lump in a mixing bowl.",
+    final_common_flaws: [
+      "dough is still unshaped in the mixing bowl",
+      "loaf is collapsed or torn apart",
+      "no pan or tray is used",
+    ],
+  },
+  "pizza-dough": {
+    final_success_criteria:
+      "A roughly round pizza base is stretched on a floured surface or peel with a slightly thicker rim, ready for toppings.",
+    final_common_flaws: [
+      "dough is still a thick unstretched ball",
+      "holes are torn through the center",
+      "shape is tiny and uneven",
+    ],
+  },
+  "remove-stains": {
+    final_success_criteria:
+      "The treated fabric area is rinsed or damp from cleaning and the stain looks lighter or gone compared with a dirty untreated spot.",
+    final_common_flaws: [
+      "stain looks darker or more spread out",
+      "item was never rinsed",
+      "wrong clean garment is shown instead",
+    ],
+  },
+  "organize-tools": {
+    final_success_criteria:
+      "Tools sit in grouped homes on a rack, in a tray, or in a toolbox with clear divisions or labels, not in one tangled heap on the floor.",
+    final_common_flaws: [
+      "tools are still in a random pile",
+      "sharp tools point up unsafely",
+      "no labels or divisions are visible",
+    ],
+  },
+  "fold-a-fitted-sheet": {
+    final_success_criteria:
+      "The fitted sheet lies in a compact rectangle on a flat surface with elastic mostly hidden inside the folds.",
+    final_common_flaws: [
+      "sheet is still a crumpled heap",
+      "elastic edges stick out in a circle",
+      "it is rolled into a messy tube instead of folded",
+    ],
+  },
+};
+
+function finalFieldsFor(id, skillName) {
+  const seeded = SEED_FINAL[id];
+  if (seeded) return { ...seeded };
+  const name = skillName || "the skill";
+  return {
+    final_success_criteria: `The finished result of ${name} is clearly visible, complete, and neat in the photo.`,
+    final_common_flaws: [
+      "result looks unfinished",
+      "work is out of frame or blocked",
+      "a different unfinished task is shown",
+    ],
+  };
+}
+
 function persist() {
   const payload = [...lessons.values()];
   fs.writeFileSync(storePath, `${JSON.stringify(payload, null, 2)}\n`);
@@ -62,6 +178,7 @@ function fromCurriculumSkill(skill, category, persona) {
     materials: SEED_MATERIALS[id] || ["the items named in the steps"],
     persona: persona || DEFAULT_PERSONA,
     preservedBy: { name: "", story: "" },
+    ...finalFieldsFor(id, skill.name),
     steps: withVerifiableSteps(skill.steps),
     createdAt: "2026-10-24T00:00:00.000Z",
   };
@@ -77,6 +194,7 @@ function extraSeededLesson() {
     materials: ["fitted sheet", "flat surface"],
     persona: DEFAULT_PERSONA,
     preservedBy: { name: "", story: "" },
+    ...finalFieldsFor("fold-a-fitted-sheet", "Fold a fitted sheet"),
     steps: withVerifiableSteps([
       {
         title: "Find the corners",
@@ -127,6 +245,7 @@ function seedFromCurriculum() {
       materials: SEED_MATERIALS["sew-button"],
       persona: catalog.persona || DEFAULT_PERSONA,
       preservedBy: { name: "", story: "" },
+      ...finalFieldsFor("sew-button", catalog.skill),
       steps: withVerifiableSteps(catalog.steps),
       createdAt: "2026-10-24T00:00:00.000Z",
     });
@@ -210,6 +329,11 @@ export function normalizeGeneratedLesson(raw, extras = {}) {
     ? raw.materials.map((item) => clip(item, 80)).filter(Boolean)
     : [];
 
+  const defaults = finalFieldsFor(null, skill);
+  const finalFlaws = Array.isArray(raw.final_common_flaws)
+    ? raw.final_common_flaws.map((item) => clip(item, 160)).filter(Boolean).slice(0, 3)
+    : [];
+
   return {
     id: uniqueLessonId(skill),
     skill,
@@ -222,6 +346,10 @@ export function normalizeGeneratedLesson(raw, extras = {}) {
       name: clip(extras.preservedBy?.name, 80),
       story: clip(extras.preservedBy?.story, 400),
     },
+    final_success_criteria:
+      clip(raw.final_success_criteria, 400) || defaults.final_success_criteria,
+    final_common_flaws:
+      finalFlaws.length > 0 ? finalFlaws : defaults.final_common_flaws,
     steps,
     createdAt: new Date().toISOString(),
   };
@@ -241,6 +369,13 @@ export function mockGeneratedLesson() {
       difficulty: "beginner",
       estimatedMinutes: 25,
       materials: ["flour", "water", "salt", "bowl", "skillet"],
+      final_success_criteria:
+        "Cooked flatbreads show browned spots on both sides and sit stacked or beside the skillet, looking set rather than raw dough.",
+      final_common_flaws: [
+        "dough is still pale and raw-looking",
+        "bread is burnt black",
+        "only uncooked dough rounds are shown",
+      ],
       steps: [
         {
           title: "Mix the dough",
@@ -283,6 +418,21 @@ export function mockGeneratedLesson() {
   );
 }
 
+function backfillFinalFields(lesson) {
+  if (lesson.final_success_criteria && Array.isArray(lesson.final_common_flaws)
+    && lesson.final_common_flaws.length > 0) {
+    return false;
+  }
+  const finals = finalFieldsFor(lesson.id, lesson.skill);
+  if (!lesson.final_success_criteria) {
+    lesson.final_success_criteria = finals.final_success_criteria;
+  }
+  if (!Array.isArray(lesson.final_common_flaws) || lesson.final_common_flaws.length === 0) {
+    lesson.final_common_flaws = finals.final_common_flaws;
+  }
+  return true;
+}
+
 loadStore();
 let seeded = false;
 for (const lesson of seedFromCurriculum()) {
@@ -291,4 +441,8 @@ for (const lesson of seedFromCurriculum()) {
     seeded = true;
   }
 }
-if (seeded || !fs.existsSync(storePath)) persist();
+let backfilled = false;
+for (const lesson of lessons.values()) {
+  if (backfillFinalFields(lesson)) backfilled = true;
+}
+if (seeded || backfilled || !fs.existsSync(storePath)) persist();

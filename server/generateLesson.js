@@ -16,9 +16,11 @@ export function generateLessonPrompt(text, category) {
     "- 2 to 3 common_mistakes",
     'Set "verifiable": false for any step a camera cannot reasonably confirm (taste, smell, waiting time, temperature). For those steps, success_criteria should describe what the user should self-confirm.',
     "Also suggest skill (title), category, difficulty (beginner|intermediate|advanced), estimatedMinutes, and a materials list.",
+    "Also include final_success_criteria: a visually concrete description of what the finished result should look like in a photo after all steps.",
+    "Also include final_common_flaws: an array of 2 to 3 common flaws visible in a finished-result photo.",
     "If the content is unsafe to teach as a casual activity (hazardous chemicals, mains electrical work, or firearms), return ONLY {\"refused\": true, \"reason\": \"...\"}.",
     "Return ONLY valid JSON with no preamble and no markdown fences, matching this shape (without id, createdAt, or persona):",
-    '{"skill":"...","category":"...","difficulty":"beginner","estimatedMinutes":10,"materials":["..."],"steps":[{"title":"...","instruction":"...","success_criteria":"...","common_mistakes":["...","..."],"verifiable":true}]}',
+    '{"skill":"...","category":"...","difficulty":"beginner","estimatedMinutes":10,"materials":["..."],"final_success_criteria":"...","final_common_flaws":["...","..."],"steps":[{"title":"...","instruction":"...","success_criteria":"...","common_mistakes":["...","..."],"verifiable":true}]}',
   ].filter(Boolean).join("\n");
 }
 
@@ -38,6 +40,12 @@ export function mockLessonFromRequest(skillHint, instructions = "", extras = {})
       difficulty: "beginner",
       estimatedMinutes: 15,
       materials: ["the items named in the steps", "a clear workspace"],
+      final_success_criteria: `The finished result of ${skill} is clearly visible, complete, and neat in the photo.`,
+      final_common_flaws: [
+        "result looks unfinished",
+        "work is out of frame or blocked",
+        "a different unfinished task is shown",
+      ],
       steps: [
         {
           title: "Set up your space",

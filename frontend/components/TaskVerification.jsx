@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { checkFrame, fileToJpegBase64 } from '../api';
 
 export default function TaskVerification({
+  sessionId = '',
   taskName = 'Selected Skill',
   taskDescription = '',
   onVerified,
@@ -34,41 +34,56 @@ export default function TaskVerification({
   async function checkTask() {
     if (!file || checking || disabled) return;
 
+    if (!sessionId) {
+      setError('No coaching session yet. Go back and open the skill again.');
+      return;
+    }
+
     setChecking(true);
     setError('');
     setResult(null);
 
     try {
-      const formData = new FormData();
-      formData.append('image', file);
-      formData.append('taskName', taskName);
-      formData.append('taskDescription', taskDescription);
+      const image = await fileToJpegBase64(file);
+      const data = await checkFrame(sessionId, image);
 
-      const response = await fetch(`${API_URL}/skills/verify`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('The verification service could not review your photo.');
+      if (data.needsSelfConfirm) {
+        setResult({
+          completed: false,
+          title: 'Self-check step',
+          feedback:
+            data.coachLine ||
+            data.feedback ||
+            'This step cannot be checked by camera. Confirm it in the coach flow when you are ready.',
+        });
+        return;
       }
 
-      const data = await response.json();
-      const completed = Boolean(data.completed);
+      const completed = Boolean(
+        data.completed || (data.stepComplete && !data.currentStep),
+      );
+      const lookingGood = Boolean(
+        data.criteria_met || data.stepComplete || data.passStreak > 0,
+      );
 
       setResult({
-        completed,
-        title: completed ? 'Task verified!' : 'Not quite there yet',
-        feedback: data.feedback || 'Your photo has been reviewed.',
+        completed: completed || lookingGood,
+        title: completed
+          ? 'Lesson complete!'
+          : lookingGood
+            ? 'Looking good!'
+            : 'Not quite there yet',
+        feedback:
+          data.coachLine ||
+          data.feedback ||
+          'Your photo has been reviewed.',
       });
 
-      if (completed) {
+      if (completed || data.stepComplete || lookingGood) {
         await onVerified?.();
       }
     } catch (err) {
-      setError(
-        err.message || 'Verification failed. Please try again.'
-      );
+      setError(err.message || 'Verification failed. Please try again.');
     } finally {
       setChecking(false);
     }
@@ -78,9 +93,14 @@ export default function TaskVerification({
     <section className="panel">
       <h3 className="panelTitle">📸 Verify Your Skill</h3>
       <p>
-        Upload a photo of your completed task: <strong>{taskName}</strong>.
-        The AI can review it and provide feedback.
+        Upload a photo of your work on: <strong>{taskName}</strong>.
+        The coach reviews it against the current lesson step.
       </p>
+      {taskDescription ? (
+        <p className="meta" style={{ whiteSpace: 'pre-wrap' }}>
+          {taskDescription}
+        </p>
+      ) : null}
 
       <label className="label" htmlFor="task-photo">
         Choose a photo
