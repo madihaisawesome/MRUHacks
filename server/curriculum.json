@@ -1,60 +1,568 @@
 {
-  "skill": "Sew on a button",
   "persona": "a warm, patient grandparent teaching a young person",
-  "steps": [
+  "defaultSkillId": "sew-a-button",
+  "categories": [
     {
-      "id": 1,
-      "title": "Thread the needle",
-      "instruction": "Thread about 60cm of thread through the needle and knot the end.",
-      "success_criteria": "A needle with thread through the eye is visible, and a knot is visible at the tail end.",
-      "common_mistakes": [
-        "thread not through the eye",
-        "no knot",
-        "thread far too short"
+      "id": "clothing-and-crafts",
+      "name": "Clothing and crafts",
+      "skills": [
+        {
+          "id": "sew-a-button",
+          "name": "Sew a button",
+          "steps": [
+            {
+              "id": 1,
+              "title": "Thread the needle",
+              "instruction": "Thread about 60cm of thread through the needle and knot the end.",
+              "success_criteria": "A needle with thread through the eye is visible, and a knot is visible at the tail end.",
+              "common_mistakes": [
+                "thread not through the eye",
+                "no knot",
+                "thread far too short"
+              ]
+            },
+            {
+              "id": 2,
+              "title": "Position the button",
+              "instruction": "Place the button where you want it on the fabric and hold it securely.",
+              "success_criteria": "The button is positioned flat against the fabric in the intended spot and is being held securely.",
+              "common_mistakes": [
+                "button is crooked",
+                "button is not on the fabric",
+                "button is not held securely"
+              ]
+            },
+            {
+              "id": 3,
+              "title": "Make the first stitch",
+              "instruction": "Push the needle up through the fabric beside a button hole, then down through the hole.",
+              "success_criteria": "The thread passes up through the fabric and down through one button hole, with the button still in position.",
+              "common_mistakes": [
+                "needle starts on top of the fabric",
+                "thread misses the button hole",
+                "button moves out of position"
+              ]
+            },
+            {
+              "id": 4,
+              "title": "Sew through both holes",
+              "instruction": "Repeat the stitch through each button hole at least four times so the button is firmly attached.",
+              "success_criteria": "Several neat stitches are visible through both button holes, and the button is attached firmly to the fabric.",
+              "common_mistakes": [
+                "too few stitches",
+                "stitches do not pass through both holes",
+                "thread is loose"
+              ]
+            },
+            {
+              "id": 5,
+              "title": "Tie off the thread",
+              "instruction": "Make two small stitches on the back of the fabric and tie a secure knot before trimming the thread.",
+              "success_criteria": "A secure knot is visible on the back of the fabric and the remaining thread is neatly trimmed.",
+              "common_mistakes": [
+                "no knot",
+                "knot is loose",
+                "thread is left very long"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "knot-a-tie",
+          "name": "Knot a tie",
+          "steps": [
+            {
+              "id": 1,
+              "title": "Drape the tie",
+              "instruction": "Drape the tie around your neck with the wide end on your right, hanging about 20cm lower than the narrow end.",
+              "success_criteria": "The tie is around the neck, wide end on the wearer's right, and clearly longer than the narrow end.",
+              "common_mistakes": [
+                "wide end is on the left",
+                "both ends are the same length",
+                "tie is not around the neck"
+              ]
+            },
+            {
+              "id": 2,
+              "title": "Cross the wide end",
+              "instruction": "Cross the wide end over the narrow end, then wrap it underneath and back across the front.",
+              "success_criteria": "The wide end has crossed over, gone under, and come back across the front of the narrow end, forming an X.",
+              "common_mistakes": [
+                "narrow end is being wrapped instead",
+                "wide end was not brought under",
+                "the two ends are not crossed"
+              ]
+            },
+            {
+              "id": 3,
+              "title": "Bring it up through the neck loop",
+              "instruction": "Bring the wide end up through the neck loop from underneath.",
+              "success_criteria": "The wide end is coming up through the loop around the neck, ready to go down through the knot.",
+              "common_mistakes": [
+                "wide end goes down through the neck loop",
+                "narrow end is being pulled",
+                "the wrap around the neck is lost"
+              ]
+            },
+            {
+              "id": 4,
+              "title": "Slide through the knot",
+              "instruction": "Hold the front of the knot open and slide the wide end down through it.",
+              "success_criteria": "The wide end is threaded down through the front knot and both ends hang downward.",
+              "common_mistakes": [
+                "wide end misses the front knot",
+                "the knot has come undone",
+                "narrow end is pulled through instead"
+              ]
+            },
+            {
+              "id": 5,
+              "title": "Tighten and center",
+              "instruction": "Hold the narrow end and slide the knot up to the collar, then center it.",
+              "success_criteria": "A neat knot sits at the collar, the dimple or front blade hangs straight, and the narrow end is hidden behind the wide end.",
+              "common_mistakes": [
+                "knot is loose or crooked",
+                "knot sits too low",
+                "narrow end shows below the wide end"
+              ]
+            }
+          ]
+        }
       ]
     },
     {
-      "id": 2,
-      "title": "Position the button",
-      "instruction": "Place the button where you want it on the fabric and hold it securely.",
-      "success_criteria": "The button is positioned flat against the fabric in the intended spot and is being held securely.",
-      "common_mistakes": [
-        "button is crooked",
-        "button is not on the fabric",
-        "button is not held securely"
+      "id": "everyday-repairs",
+      "name": "Everyday repairs",
+      "skills": [
+        {
+          "id": "fix-cabinet-handle",
+          "name": "Fix a loose cabinet handle",
+          "steps": [
+            {
+              "id": 1,
+              "title": "Find the loose screws",
+              "instruction": "Open the cabinet door or drawer and look on the inside for the handle screws.",
+              "success_criteria": "The inside of the door or drawer is in view and the handle screws (or empty screw holes) are clearly visible.",
+              "common_mistakes": [
+                "only the outside of the handle is shown",
+                "screws are out of frame",
+                "the camera is looking at a different piece of furniture"
+              ]
+            },
+            {
+              "id": 2,
+              "title": "Align the handle",
+              "instruction": "Hold the handle straight on the outside while keeping the screw holes lined up.",
+              "success_criteria": "The handle is held level on the outside and the screw holes on the inside still line up with it.",
+              "common_mistakes": [
+                "handle is crooked",
+                "handle is not against the door",
+                "holes do not line up"
+              ]
+            },
+            {
+              "id": 3,
+              "title": "Start the screws by hand",
+              "instruction": "Thread each screw through the inside hole into the handle by hand so it catches, without forcing it.",
+              "success_criteria": "Each screw is started straight in its hole and has begun to catch in the handle.",
+              "common_mistakes": [
+                "screws are cross-threaded",
+                "screws are missing",
+                "screws are driven in at an angle"
+              ]
+            },
+            {
+              "id": 4,
+              "title": "Tighten evenly",
+              "instruction": "Use a screwdriver to tighten the screws a little at a time, switching between them so the handle stays straight.",
+              "success_criteria": "Both screws are snug, the handle sits flush and straight, and it does not wiggle when touched.",
+              "common_mistakes": [
+                "only one screw is tight",
+                "handle is still loose",
+                "handle is pulled crooked from overtightening one side"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "replace-car-tire",
+          "name": "Replace a car tire",
+          "steps": [
+            {
+              "id": 1,
+              "title": "Park and set the brake",
+              "instruction": "Park on level ground, put the car in park (or in gear), and set the parking brake. Place the spare, jack, and lug wrench nearby.",
+              "success_criteria": "The car is stationary on level ground, the parking brake is engaged if visible, and the spare, jack, and lug wrench are laid out beside the wheel.",
+              "common_mistakes": [
+                "tools are not in view",
+                "car appears to be on a slope",
+                "spare tire is still in the trunk"
+              ]
+            },
+            {
+              "id": 2,
+              "title": "Loosen the lug nuts",
+              "instruction": "With the wheel still on the ground, fit the lug wrench and loosen each lug nut a half-turn, turning counterclockwise.",
+              "success_criteria": "The wrench is on a lug nut, the wheel is still on the ground, and at least some nuts have been cracked loose (not fully removed).",
+              "common_mistakes": [
+                "wheel is already jacked up",
+                "nuts are being tightened instead of loosened",
+                "wrench is not seated on the nut"
+              ]
+            },
+            {
+              "id": 3,
+              "title": "Jack the car and remove the wheel",
+              "instruction": "Place the jack at the marked lift point, raise the tire just off the ground, then remove the nuts and pull the wheel off.",
+              "success_criteria": "The jack is under a proper lift point, the tire is off the ground, lug nuts are off, and the wheel is removed from the hub.",
+              "common_mistakes": [
+                "jack is under an unsafe spot",
+                "tire is still on the ground",
+                "wheel is still mounted"
+              ]
+            },
+            {
+              "id": 4,
+              "title": "Mount the spare",
+              "instruction": "Lift the spare onto the hub, lining up the holes with the wheel studs, and push it on fully.",
+              "success_criteria": "The spare is seated on the hub with the studs coming through the holes, and the wheel sits flush against the hub.",
+              "common_mistakes": [
+                "spare is not fully on the studs",
+                "wheel is backwards",
+                "wrong wheel is being mounted"
+              ]
+            },
+            {
+              "id": 5,
+              "title": "Tighten, lower, and finish",
+              "instruction": "Hand-tighten the lug nuts in a star pattern, lower the car, then fully tighten the nuts in the same star pattern.",
+              "success_criteria": "The spare is on the ground, all lug nuts are installed and snug in a star pattern, and the jack is no longer holding the car.",
+              "common_mistakes": [
+                "nuts are missing",
+                "car is still jacked up",
+                "nuts were tightened only on one side"
+              ]
+            }
+          ]
+        }
       ]
     },
     {
-      "id": 3,
-      "title": "Make the first stitch",
-      "instruction": "Push the needle up through the fabric beside a button hole, then down through the hole.",
-      "success_criteria": "The thread passes up through the fabric and down through one button hole, with the button still in position.",
-      "common_mistakes": [
-        "needle starts on top of the fabric",
-        "thread misses the button hole",
-        "button moves out of position"
+      "id": "gardening",
+      "name": "Gardening",
+      "skills": [
+        {
+          "id": "grow-herbs",
+          "name": "Grow herbs",
+          "steps": [
+            {
+              "id": 1,
+              "title": "Choose a pot with drainage",
+              "instruction": "Pick a clean pot with a drainage hole and set it in a tray or saucer.",
+              "success_criteria": "A pot with a visible drainage hole is in frame, sitting in a tray or saucer.",
+              "common_mistakes": [
+                "pot has no drainage hole",
+                "no tray or saucer underneath",
+                "a closed container is being used"
+              ]
+            },
+            {
+              "id": 2,
+              "title": "Add potting mix",
+              "instruction": "Fill the pot with potting mix up to about 2cm below the rim, then gently level the surface.",
+              "success_criteria": "The pot is filled with potting mix, with a small gap below the rim and a relatively level surface.",
+              "common_mistakes": [
+                "pot is empty or only partly filled",
+                "soil is packed above the rim",
+                "garden dirt is used instead of potting mix if that is obvious"
+              ]
+            },
+            {
+              "id": 3,
+              "title": "Plant the herbs",
+              "instruction": "Make a small hole, place the seedling or seeds, and cover lightly so they sit at the right depth.",
+              "success_criteria": "A seedling is planted upright with soil covering the roots, or seeds are covered with a thin layer of mix and are no longer sitting on top.",
+              "common_mistakes": [
+                "roots are still exposed",
+                "seeds are sitting uncovered",
+                "plant is lying on its side"
+              ]
+            },
+            {
+              "id": 4,
+              "title": "Water and place in light",
+              "instruction": "Water until a little moisture shows at the drainage hole, then set the pot in a bright spot.",
+              "success_criteria": "The soil surface looks evenly moist (not flooded), and the pot is in a bright location such as a windowsill.",
+              "common_mistakes": [
+                "soil is bone dry",
+                "pot is sitting in a deep puddle",
+                "pot is in a dark corner"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "compost",
+          "name": "Compost",
+          "steps": [
+            {
+              "id": 1,
+              "title": "Set up the bin",
+              "instruction": "Place a compost bin or open pile container on soil or a tray, with room to add layers.",
+              "success_criteria": "An empty or nearly empty compost bin or pile container is clearly in view and ready to fill.",
+              "common_mistakes": [
+                "a sealed trash bag is being used",
+                "no container is visible",
+                "the bin is still closed with no opening to add material"
+              ]
+            },
+            {
+              "id": 2,
+              "title": "Add a brown layer",
+              "instruction": "Add a layer of dry browns such as leaves, shredded paper, or cardboard.",
+              "success_criteria": "A visible layer of dry brown material covers the bottom of the bin.",
+              "common_mistakes": [
+                "only food scraps are in the bin",
+                "the layer is missing",
+                "plastic or glossy paper is being added"
+              ]
+            },
+            {
+              "id": 3,
+              "title": "Add a green layer",
+              "instruction": "Add a thinner layer of greens such as fruit and vegetable scraps, then keep meat and dairy out.",
+              "success_criteria": "Food scraps or other greens are layered on top of the browns, with no obvious meat, dairy, or plastic.",
+              "common_mistakes": [
+                "meat or dairy is in the pile",
+                "greens are dumped with no brown layer underneath",
+                "plastic bags or stickers are still on the scraps"
+              ]
+            },
+            {
+              "id": 4,
+              "title": "Moisten and mix",
+              "instruction": "Lightly water the pile so it feels like a wrung-out sponge, then mix or cover with another thin brown layer.",
+              "success_criteria": "The pile looks slightly damp, mixed or covered with browns, and not dripping wet.",
+              "common_mistakes": [
+                "pile is bone dry",
+                "pile is waterlogged",
+                "everything is still in two unmixed clumps"
+              ]
+            }
+          ]
+        }
       ]
     },
     {
-      "id": 4,
-      "title": "Sew through both holes",
-      "instruction": "Repeat the stitch through each button hole at least four times so the button is firmly attached.",
-      "success_criteria": "Several neat stitches are visible through both button holes, and the button is attached firmly to the fabric.",
-      "common_mistakes": [
-        "too few stitches",
-        "stitches do not pass through both holes",
-        "thread is loose"
+      "id": "cooking",
+      "name": "Cooking",
+      "skills": [
+        {
+          "id": "bake-bread",
+          "name": "Bake bread",
+          "steps": [
+            {
+              "id": 1,
+              "title": "Measure the ingredients",
+              "instruction": "Measure flour, water, yeast, and salt into separate bowls or a scale so they are ready to mix.",
+              "success_criteria": "Flour, water, yeast, and salt are each visible and measured, ready to combine.",
+              "common_mistakes": [
+                "key ingredients are missing",
+                "ingredients are still in unopened packages with no amounts measured",
+                "the workspace shows unrelated food"
+              ]
+            },
+            {
+              "id": 2,
+              "title": "Mix the dough",
+              "instruction": "Combine the ingredients in a bowl until no dry flour remains and a shaggy dough forms.",
+              "success_criteria": "A single mass of dough is in the bowl with little or no dry flour left on the sides.",
+              "common_mistakes": [
+                "dry flour pockets remain",
+                "ingredients are still separate",
+                "the mixture is a thin batter"
+              ]
+            },
+            {
+              "id": 3,
+              "title": "Knead until smooth",
+              "instruction": "Knead on a lightly floured surface until the dough is smooth and springs back when poked.",
+              "success_criteria": "The dough is a smooth ball on the work surface, not a sticky blob or a pile of dry crumbs.",
+              "common_mistakes": [
+                "dough is still shaggy",
+                "too much extra flour is caked on",
+                "dough is stuck in a wet mess on the counter"
+              ]
+            },
+            {
+              "id": 4,
+              "title": "Shape and place for the oven",
+              "instruction": "Shape the dough into a loaf or round, place it in a pan or on a tray, and show it ready to bake after rising.",
+              "success_criteria": "A shaped loaf sits in a pan or on a tray, covering most of the pan and looking risen rather than a tight unshaped lump.",
+              "common_mistakes": [
+                "dough is still a tight unshaped ball in the mixing bowl",
+                "no pan or tray is used",
+                "dough has been flattened or torn apart"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "pizza-dough",
+          "name": "Make pizza dough from scratch",
+          "steps": [
+            {
+              "id": 1,
+              "title": "Stir the yeast",
+              "instruction": "Stir yeast into warm water (and a pinch of sugar if using) and wait until it looks foamy.",
+              "success_criteria": "A bowl or cup of warm water with yeast is in view, and the surface looks slightly foamy or cloudy from the yeast.",
+              "common_mistakes": [
+                "dry yeast is sitting unmixed",
+                "the liquid looks like plain water with nothing added",
+                "boiling water is being used"
+              ]
+            },
+            {
+              "id": 2,
+              "title": "Bring the dough together",
+              "instruction": "Add flour and salt, then mix until a dough ball forms.",
+              "success_criteria": "A single dough ball is in the bowl, with flour mostly incorporated.",
+              "common_mistakes": [
+                "dry flour remains at the bottom",
+                "mixture is a soup",
+                "salt or flour was never added"
+              ]
+            },
+            {
+              "id": 3,
+              "title": "Knead until elastic",
+              "instruction": "Knead for several minutes until the dough is smooth and stretchy.",
+              "success_criteria": "The dough is smooth, slightly elastic, and holds a ball shape on the counter or in the bowl.",
+              "common_mistakes": [
+                "dough is still lumpy",
+                "dough is tearing into dry pieces",
+                "dough is a sticky smear"
+              ]
+            },
+            {
+              "id": 4,
+              "title": "Stretch a round",
+              "instruction": "Press and stretch the dough into a round on a floured surface or peel, leaving a slightly thicker rim.",
+              "success_criteria": "A roughly round pizza base is visible with a thicker edge, ready for toppings.",
+              "common_mistakes": [
+                "dough is still a thick ball",
+                "holes are torn through the center",
+                "shape is a tiny lump that was never stretched"
+              ]
+            }
+          ]
+        }
       ]
     },
     {
-      "id": 5,
-      "title": "Tie off the thread",
-      "instruction": "Make two small stitches on the back of the fabric and tie a secure knot before trimming the thread.",
-      "success_criteria": "A secure knot is visible on the back of the fabric and the remaining thread is neatly trimmed.",
-      "common_mistakes": [
-        "no knot",
-        "knot is loose",
-        "thread is left very long"
+      "id": "household-skills",
+      "name": "Household skills",
+      "skills": [
+        {
+          "id": "remove-stains",
+          "name": "Remove common stains",
+          "steps": [
+            {
+              "id": 1,
+              "title": "Find the stain",
+              "instruction": "Lay the stained item flat and point out the stain so the whole spot is in view.",
+              "success_criteria": "The stained fabric is laid flat and the stain itself is clearly visible in the frame.",
+              "common_mistakes": [
+                "item is bunched up",
+                "stain is out of frame",
+                "a different clean item is shown"
+              ]
+            },
+            {
+              "id": 2,
+              "title": "Blot, do not rub",
+              "instruction": "Blot the stain with a clean cloth or paper towel to lift extra liquid, without scrubbing.",
+              "success_criteria": "A clean cloth or towel is being pressed on the stain, and the fabric is not being scrubbed in circles.",
+              "common_mistakes": [
+                "fabric is being rubbed hard",
+                "nothing is blotting the stain",
+                "the stain is being spread outward"
+              ]
+            },
+            {
+              "id": 3,
+              "title": "Treat the spot",
+              "instruction": "Apply a small amount of stain remover, dish soap, or cold water to the stain and work it in gently.",
+              "success_criteria": "A small amount of treatment is on the stained area only, and it is being worked in gently.",
+              "common_mistakes": [
+                "the whole garment is soaked",
+                "no treatment is applied",
+                "hot water is being poured on a protein stain if that is obvious"
+              ]
+            },
+            {
+              "id": 4,
+              "title": "Rinse and check",
+              "instruction": "Rinse with cold water from the back of the fabric and check whether the stain has lifted.",
+              "success_criteria": "The treated area is being rinsed or is wet from rinsing, and the stain looks lighter or gone compared with the start.",
+              "common_mistakes": [
+                "item is put straight into a dryer",
+                "no rinse is shown",
+                "stain looks darker and more spread out"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "organize-tools",
+          "name": "Organize tools",
+          "steps": [
+            {
+              "id": 1,
+              "title": "Gather the tools",
+              "instruction": "Bring the loose tools to one clear workspace so you can see everything you have.",
+              "success_criteria": "A collection of tools is gathered on a clear table, bench, or floor area.",
+              "common_mistakes": [
+                "tools are still scattered in another room",
+                "the workspace is empty",
+                "unrelated household clutter is the only thing in view"
+              ]
+            },
+            {
+              "id": 2,
+              "title": "Group by type",
+              "instruction": "Sort tools into groups such as hammers, screwdrivers, wrenches, and measuring tools.",
+              "success_criteria": "Tools are in distinct groups by type rather than one mixed pile.",
+              "common_mistakes": [
+                "everything is still in one heap",
+                "groups are mixed together again",
+                "only one tool was moved"
+              ]
+            },
+            {
+              "id": 3,
+              "title": "Put them in a home",
+              "instruction": "Place each group into a drawer, toolbox tray, pegboard, or wall rack so handles are easy to grab.",
+              "success_criteria": "Most tools are in a drawer, box, or on a rack, with handles or heads visible and not stacked in a tangle.",
+              "common_mistakes": [
+                "tools are still on the floor",
+                "items are dumped in a bag",
+                "sharp tools are pointing up unsafely"
+              ]
+            },
+            {
+              "id": 4,
+              "title": "Label the groups",
+              "instruction": "Add simple labels or a clear layout so each group has a marked spot.",
+              "success_criteria": "Labels, tape, or a clearly divided tray/rack shows where each tool group belongs.",
+              "common_mistakes": [
+                "no labels or divisions are visible",
+                "tools have been put back in a random jumble",
+                "labels do not match the tools in that spot"
+              ]
+            }
+          ]
+        }
       ]
     }
   ]

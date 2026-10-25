@@ -13,8 +13,21 @@ import { sessions } from "./sessions.js";
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const curriculum = JSON.parse(
+const catalog = JSON.parse(
   fs.readFileSync(path.join(__dirname, "curriculum.json"), "utf8"),
+);
+const skillsById = new Map(
+  catalog.categories.flatMap((category) =>
+    category.skills.map((skill) => [
+      skill.id,
+      {
+        ...skill,
+        categoryId: category.id,
+        categoryName: category.name,
+        persona: skill.persona || catalog.persona,
+      },
+    ]),
+  ),
 );
 const app = express();
 const port = Number(process.env.PORT || 3001);
@@ -24,7 +37,21 @@ const anthropic = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   : null;
 
-app.use(cors({ origin: "http://localhost:5173" }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (
+        !origin ||
+        origin === "http://localhost:5173" ||
+        origin === "http://127.0.0.1:5173"
+      ) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error("Origin is not allowed by CORS."));
+    },
+  }),
+);
 app.use(express.json({ limit: "10mb" }));
 
 function publicStep(step) {
@@ -33,27 +60,48 @@ function publicStep(step) {
     : null;
 }
 
+function getSkill(skillId) {
+  return skillsById.get(skillId || catalog.defaultSkillId) || null;
+}
+
+function publicSkill(skill) {
+  return {
+    id: skill.id,
+    name: skill.name,
+    categoryId: skill.categoryId,
+    categoryName: skill.categoryName,
+    totalSteps: skill.steps.length,
+  };
+}
+
+function getSessionSkill(session) {
+  return getSkill(session.skillId);
+}
+
 function getSessionStep(session) {
-  return curriculum.steps.find((step) => step.id === session.currentStep);
+  const skill = getSessionSkill(session);
+  return skill?.steps.find((step) => step.id === session.currentStep) || null;
 }
 
 function sessionResponse(session, feedback, extra = {}) {
+  const skill = getSessionSkill(session);
   return {
     stepComplete: Boolean(extra.stepComplete),
     advanced: Boolean(extra.advanced),
     completed: session.completed,
+    skill: skill ? publicSkill(skill) : null,
     currentStep: publicStep(getSessionStep(session)),
     feedback,
     passStreak: session.passStreak,
     attempts: session.attempts,
-    totalSteps: curriculum.steps.length,
+    totalSteps: skill?.steps.length || 0,
     ...extra,
   };
 }
 
-function modelPrompt(step) {
+function modelPrompt(skill, step) {
   return [
-    `You are ${curriculum.persona}.`,
+    `You are ${skill.persona}.`,
     "Assess the user's current craft work in the image for this step only.",
     `Step title: ${step.title}`,
     `Success criteria: ${step.success_criteria}`,
@@ -87,7 +135,7 @@ function parseModelResponse(response) {
   return result;
 }
 
-async function assessImage(image, step, sessionId) {
+async function assessImage(image, skill, step, sessionId) {
   if (process.env.MOCK_MODE === "true") {
     await new Promise((resolve) => setTimeout(resolve, 1500));
     const count = (mockChecks.get(sessionId) || 0) + 1;
@@ -111,7 +159,7 @@ async function assessImage(image, step, sessionId) {
         role: "user",
         content: [
           { type: "image", source: { type: "base64", media_type: "image/jpeg", data: image } },
-          { type: "text", text: modelPrompt(step) },
+          { type: "text", text: modelPrompt(skill, step) },
         ],
       },
     ],
@@ -130,41 +178,60 @@ async function assessImage(image, step, sessionId) {
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-app.post("/session/start", (_req, res) => {
+app.get("/skills", (_req, res) => {
+  res.json({
+    defaultSkillId: catalog.defaultSkillId,
+    categories: catalog.categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      skills: category.skills.map((skill) => ({
+        id: skill.id,
+        name: skill.name,
+        totalSteps: skill.steps.length,
+      })),
+    })),
+  });
+});
+
+function startSessionPayload(sessionId, skill) {
+  return {
+    sessionId,
+    skill: publicSkill(skill),
+    totalSteps: skill.steps.length,
+    step: publicStep(skill.steps[0]),
+  };
+}
+
+app.post("/session/start", (req, res) => {
+  const skill = getSkill(req.body?.skillId);
+  if (!skill) return res.status(404).json({ error: "skill not found" });
   const sessionId = crypto.randomUUID();
-  const session = {
-    currentStep: curriculum.steps[0].id,
+  sessions.set(sessionId, {
+    skillId: skill.id,
+    currentStep: skill.steps[0].id,
     attempts: 0,
     passStreak: 0,
     history: [],
     completed: false,
-  };
-  sessions.set(sessionId, session);
-  res.json({
-    sessionId,
-    skill: curriculum.skill,
-    totalSteps: curriculum.steps.length,
-    step: publicStep(curriculum.steps[0]),
   });
+  res.json(startSessionPayload(sessionId, skill));
 });
 
 app.post("/session/reset", (req, res) => {
-  const { sessionId } = req.body || {};
+  const { sessionId, skillId } = req.body || {};
   const session = sessions.get(sessionId);
   if (!session) return res.status(404).json({ error: "session not found" });
-  session.currentStep = curriculum.steps[0].id;
+  const skill = getSkill(skillId || session.skillId);
+  if (!skill) return res.status(404).json({ error: "skill not found" });
+  session.skillId = skill.id;
+  session.currentStep = skill.steps[0].id;
   session.attempts = 0;
   session.passStreak = 0;
   session.history = [];
   session.completed = false;
   rateLimitTimes.delete(sessionId);
   mockChecks.delete(sessionId);
-  res.json({
-    sessionId,
-    skill: curriculum.skill,
-    totalSteps: curriculum.steps.length,
-    step: publicStep(curriculum.steps[0]),
-  });
+  res.json(startSessionPayload(sessionId, skill));
 });
 
 app.post("/check", async (req, res) => {
@@ -185,9 +252,10 @@ app.post("/check", async (req, res) => {
       return res.json(sessionResponse(session, "This lesson is already complete.", { stepComplete: true }));
     }
 
+    const skill = getSessionSkill(session);
     const step = getSessionStep(session);
-    if (!step) return res.status(404).json({ error: "current step not found" });
-    const assessment = await assessImage(image, step, sessionId);
+    if (!skill || !step) return res.status(404).json({ error: "current step not found" });
+    const assessment = await assessImage(image, skill, step, sessionId);
     session.history.push({
       step: step.id,
       feedback: assessment.feedback,
@@ -203,7 +271,7 @@ app.post("/check", async (req, res) => {
       session.passStreak += 1;
       if (session.passStreak >= 2) {
         const stepComplete = true;
-        const nextStep = curriculum.steps.find((candidate) => candidate.id > step.id);
+        const nextStep = skill.steps.find((candidate) => candidate.id > step.id);
         session.passStreak = 0;
         session.attempts = 0;
         if (nextStep) session.currentStep = nextStep.id;
@@ -231,8 +299,8 @@ app.post("/check", async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Skill coach server listening on http://localhost:${port}`);
+app.listen(port, "0.0.0.0", () => {
+  console.log(`Skill coach server listening on port ${port}`);
 });
 
 export { app };
