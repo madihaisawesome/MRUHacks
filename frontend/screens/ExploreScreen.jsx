@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { CATEGORIES, SKILLS } from '../data/skills';
 import { useProgress } from '../context/ProgressContext';
 import { Panel } from '../components/UI';

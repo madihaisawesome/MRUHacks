@@ -5,7 +5,9 @@ export default function GuideCard({ guide }) {
   if (!guide) return null;
 
   const icon =
-    CATEGORIES.find((category) => category.name === guide.cat)?.icon || '📜';
+    CATEGORIES.find(
+      (category) => category.name === guide.cat
+    )?.icon || '📜';
 
   return (
     <Panel>
@@ -13,7 +15,7 @@ export default function GuideCard({ guide }) {
         {guide.photo ? (
           <img
             src={guide.photo}
-            alt={guide.title}
+            alt={guide.title || 'Shared skill'}
             className="guideImage"
           />
         ) : (
@@ -23,14 +25,21 @@ export default function GuideCard({ guide }) {
         )}
 
         <div className="guideBody">
-          <div className="guideTitle">{guide.title}</div>
-
-          <div className="meta">
-            Shared by: {guide.by || 'Community'}
-            {guide.taughtBy ? ` · taught by ${guide.taughtBy}` : ''}
+          <div className="guideTitle">
+            {guide.title || 'Untitled Skill'}
           </div>
 
-          <p>{guide.story}</p>
+          <div className="meta">
+            {guide.taughtBy
+              ? `Taught by: ${guide.taughtBy}`
+              : 'Shared by: Community'}
+          </div>
+
+          <div className="meta">
+            Category: {guide.cat || 'Other'}
+          </div>
+
+          <p>{guide.story || 'No instructions provided.'}</p>
         </div>
       </div>
     </Panel>
