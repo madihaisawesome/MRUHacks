@@ -14,7 +14,7 @@ export default function HomeScreen({ go }) {
         <div className="buttonRow">
           <Button title="Explore Skills" onPress={() => go('explore')} />
           <Button
-            title="+ Preserve a Skill"
+            title="Preserve a Skill"
             variant="green"
             onPress={() => go('preserve')}
           />

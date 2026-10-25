@@ -54,9 +54,6 @@ function explainCameraError(error) {
   return 'Camera unavailable right now. Upload a photo of your work instead.';
 }
 
-/**
- * Live webcam with capture helpers. Falls back to file upload if permission is denied.
- */
 const WebcamPanel = forwardRef(function WebcamPanel(
   { disabled = false, onCameraChange },
   ref,
@@ -90,7 +87,6 @@ const WebcamPanel = forwardRef(function WebcamPanel(
       try {
         await video.play();
       } catch {
-        /* autoplay can fail until user gesture; stream is still attached */
       }
     }
     setUsingCamera(true);
@@ -140,14 +136,12 @@ const WebcamPanel = forwardRef(function WebcamPanel(
 
     return () => {
       cancelled = true;
-      // Defer stop so React Strict Mode remount can request again cleanly
       const stream = streamRef.current;
       streamRef.current = null;
       window.setTimeout(() => {
         stream?.getTracks().forEach((track) => track.stop());
       }, 250);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useImperativeHandle(ref, () => ({
