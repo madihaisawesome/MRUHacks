@@ -8,6 +8,7 @@ import { useProgress } from '../context/ProgressContext';
 import { Button, Panel } from '../components/UI';
 import WebcamPanel, { fingerprintsDiffer } from '../components/WebcamPanel';
 import {
+  advanceStep,
   checkFrame,
   confirmStep,
   getLesson,
@@ -37,11 +38,13 @@ export default function LessonScreen({ skill, onBack }) {
   const [watching, setWatching] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [passStreak, setPassStreak] = useState(0);
+  const [lookingGood, setLookingGood] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [needsSelfConfirm, setNeedsSelfConfirm] = useState(false);
   const [visibleIssue, setVisibleIssue] = useState(false);
   const [stepFlash, setStepFlash] = useState(false);
   const [autoCheck, setAutoCheck] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
 
   const [finalWatching, setFinalWatching] = useState(false);
   const [finalFeedback, setFinalFeedback] = useState('');
@@ -57,6 +60,7 @@ export default function LessonScreen({ skill, onBack }) {
     setError('');
     setFeedback('');
     setPassStreak(0);
+    setLookingGood(false);
     setShowHint(false);
     setNeedsSelfConfirm(false);
     setVisibleIssue(false);
@@ -96,6 +100,7 @@ export default function LessonScreen({ skill, onBack }) {
 
     setFeedback(data.coachLine || data.feedback || '');
     setPassStreak(Number(data.passStreak) || 0);
+    setLookingGood(Boolean(data.lookingGood) || Number(data.passStreak) >= 1);
     setShowHint(Boolean(data.hint));
     setNeedsSelfConfirm(Boolean(data.needsSelfConfirm));
     setVisibleIssue(data.visible === false);
@@ -109,14 +114,37 @@ export default function LessonScreen({ skill, onBack }) {
       clearTimeout(stepAnimRef.current);
       stepAnimRef.current = setTimeout(() => setStepFlash(false), 700);
       setPassStreak(0);
+      setLookingGood(false);
       setShowHint(false);
       setNeedsSelfConfirm(false);
+      setFeedback(data.coachLine || data.feedback || '');
     }
 
     if (data.completed) {
       setLessonComplete(true);
       setPhase('final');
       setNeedsSelfConfirm(false);
+      setLookingGood(false);
+    }
+  }
+
+  async function runAdvance({ skipped = false } = {}) {
+    if (!sessionId || advancing || watching || phase !== 'steps') return;
+    setAdvancing(true);
+    try {
+      const data = await advanceStep(sessionId);
+      applyCheckResponse({
+        ...data,
+        feedback: skipped
+          ? (data.completed
+            ? 'Skipped ahead to the final check.'
+            : `${data.feedback || 'Moved on.'}`)
+          : data.feedback,
+      });
+    } catch (err) {
+      setFeedback(err.message || 'Could not move to the next step.');
+    } finally {
+      setAdvancing(false);
     }
   }
 
@@ -302,9 +330,9 @@ export default function LessonScreen({ skill, onBack }) {
             </h3>
             <p className="stepText">{currentStep?.instruction}</p>
 
-            {passStreak === 1 && (
+            {lookingGood && (
               <p className="streakNote">
-                Looks good, hold on for one more check
+                Looks good — tap Next step when you&apos;re ready.
               </p>
             )}
 
@@ -317,7 +345,9 @@ export default function LessonScreen({ skill, onBack }) {
 
             {feedback && (
               <div
-                className={`feedbackBox ${showHint ? 'feedbackHint' : ''}`}
+                className={`feedbackBox ${
+                  lookingGood ? 'feedbackOk' : showHint ? 'feedbackHint' : ''
+                }`}
               >
                 {showHint && <strong className="hintLabel">Hint: </strong>}
                 {feedback}
@@ -329,7 +359,7 @@ export default function LessonScreen({ skill, onBack }) {
                 type="checkbox"
                 checked={autoCheck}
                 onChange={(event) => setAutoCheck(event.target.checked)}
-                disabled={watching || needsSelfConfirm}
+                disabled={watching || needsSelfConfirm || advancing}
               />
               Auto-check every 5 seconds
             </label>
@@ -339,15 +369,31 @@ export default function LessonScreen({ skill, onBack }) {
                 <Button
                   title={watching ? 'Watching...' : 'I did this'}
                   variant="green"
-                  disabled={watching}
+                  disabled={watching || advancing}
                   onPress={runConfirm}
                 />
               ) : (
                 <Button
                   title={watching ? 'Watching...' : 'Check my work'}
                   variant="green"
-                  disabled={watching}
+                  disabled={watching || advancing}
                   onPress={() => runCheck({ quiet429: false })}
+                />
+              )}
+
+              {lookingGood ? (
+                <Button
+                  title={advancing ? 'Moving on...' : 'Next step →'}
+                  variant="green"
+                  disabled={watching || advancing}
+                  onPress={() => runAdvance({ skipped: false })}
+                />
+              ) : (
+                <Button
+                  title={advancing ? 'Moving on...' : 'Skip this step →'}
+                  variant="wood"
+                  disabled={watching || advancing}
+                  onPress={() => runAdvance({ skipped: true })}
                 />
               )}
             </div>

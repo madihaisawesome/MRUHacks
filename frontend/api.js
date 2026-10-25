@@ -101,6 +101,13 @@ export function confirmStep(sessionId) {
   });
 }
 
+export function advanceStep(sessionId) {
+  return apiRequest("/session/advance", {
+    method: "POST",
+    body: JSON.stringify({ sessionId }),
+  });
+}
+
 export async function verifyFinal(sessionId, imageBase64, { quiet429 = false } = {}) {
   let response;
   try {

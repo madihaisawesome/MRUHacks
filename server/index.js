@@ -117,15 +117,16 @@ function modelPrompt(skill, step) {
   return [
     `You are ${skill.persona}.`,
     "Look at the learner's webcam photo and coach them through THIS step only.",
+    "Be encouraging and generous. This is a beginner-friendly coach, not a strict exam.",
     `Skill: ${skill.name}`,
     `Step title: ${step.title}`,
     `What they should do: ${step.instruction}`,
     `Success criteria: ${step.success_criteria}`,
     `Common mistakes: ${step.common_mistakes.join(", ")}`,
     "",
-    "If the success criteria are clearly visible, set criteria_met true and give a brief warm compliment.",
-    "If they are close but not done, set criteria_met false and tell them the ONE next physical action.",
-    "If they are on the wrong track, gently name the likely mistake and how to fix it.",
+    "If the photo roughly shows they are doing this step (even imperfectly), set criteria_met true and give a warm compliment.",
+    "Only set criteria_met false if the step clearly has not started or the wrong thing is shown.",
+    "If they are close, prefer criteria_met true and mention one optional tip in the feedback.",
     "Write feedback as if you are speaking out loud: short, specific, encouraging, maximum 2 sentences. No markdown.",
     'If the image is too dark, blurry, or does not show the work, set visible false and ask them to move the camera.',
     'Return ONLY valid JSON with no preamble and no markdown fences:',
@@ -406,6 +407,31 @@ app.post("/session/confirm", (req, res) => {
   }));
 });
 
+app.post("/session/advance", (req, res) => {
+  const { sessionId } = req.body || {};
+  const session = sessions.get(sessionId);
+  if (!session) return res.status(404).json({ error: "session not found" });
+  const lesson = getSessionLesson(session);
+  const step = getSessionStep(session);
+  if (!lesson || !step) return res.status(404).json({ error: "current step not found" });
+  if (session.completed) {
+    return res.json(sessionResponse(session, "This lesson is already complete.", {
+      stepComplete: true,
+      completed: true,
+    }));
+  }
+  const advanced = advanceSession(session, lesson, step);
+  const next = getSessionStep(session);
+  const feedback = session.completed
+    ? "Great work — every step is done. Let's check your finished result."
+    : `Onward! Next: ${next?.title || "the next step"}.`;
+  return res.json(sessionResponse(session, feedback, {
+    stepComplete: true,
+    advanced,
+    lookingGood: false,
+  }));
+});
+
 app.post("/check", async (req, res) => {
   const startedAt = Date.now();
   const { sessionId, image } = req.body || {};
@@ -446,28 +472,22 @@ app.post("/check", async (req, res) => {
     }
 
     if (assessment.criteria_met) {
-      session.passStreak += 1;
-      if (session.passStreak >= 2) {
-        const advanced = advanceSession(session, lesson, step);
-        return res.json(sessionResponse(session, assessment.feedback, {
-          stepComplete: true,
-          advanced,
-        }));
-      }
+      session.passStreak = 1;
+      session.attempts = 0;
       return res.json(sessionResponse(
         session,
-        `${assessment.feedback} Hold it there and show me once more so I can be sure.`,
-        { stepComplete: false },
+        `${assessment.feedback} Looks good — you can move on whenever you're ready.`,
+        { stepComplete: false, lookingGood: true },
       ));
     }
 
     session.passStreak = 0;
     session.attempts += 1;
-    const hint = session.attempts >= 4;
+    const hint = session.attempts >= 3;
     const feedback = hint
-      ? `${assessment.feedback} Hint: follow each part of the success criteria slowly and keep the whole work area in view.`
+      ? `${assessment.feedback} Or skip ahead if you want to keep going.`
       : assessment.feedback;
-    return res.json(sessionResponse(session, feedback, { hint }));
+    return res.json(sessionResponse(session, feedback, { hint, lookingGood: false }));
   } catch (error) {
     console.error("Image check failed:", error);
     return res.status(500).json({ error: error.message || "image check failed" });
