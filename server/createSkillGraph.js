@@ -2,7 +2,8 @@ import crypto from "node:crypto";
 
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
 
-import { generateAndSaveLesson, parseJsonFence } from "./generateLesson.js";
+import { generateAndSaveLesson } from "./generateLesson.js";
+import { completeJson, llmProvider } from "./llm.js";
 
 const conversations = new Map();
 
@@ -77,18 +78,15 @@ function understandPrompt(message, priorHint) {
   ].filter(Boolean).join("\n");
 }
 
-async function understandNode(state, config) {
-  const anthropic = config.configurable?.anthropic;
-  if (process.env.MOCK_MODE === "true" || !anthropic) {
+async function understandNode(state) {
+  if (llmProvider() === "mock" || llmProvider() === "none") {
     return mockUnderstand(state);
   }
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-5-5",
-      max_tokens: 400,
-      messages: [{ role: "user", content: understandPrompt(state.message, state.priorHint) }],
+    const parsed = await completeJson({
+      prompt: understandPrompt(state.message, state.priorHint),
+      maxTokens: 400,
     });
-    const parsed = parseJsonFence(response);
     if (parsed.intent === "unsafe") {
       return {
         route: "refuse",
@@ -118,7 +116,6 @@ async function generateNode(state, config) {
       text: [state.skillHint, state.instructions].filter(Boolean).join("\n"),
       preservedBy: state.preservedBy,
       category: state.category,
-      anthropic: config.configurable?.anthropic,
     });
     return {
       lesson,
@@ -159,21 +156,17 @@ export async function runCreateSkillGraph({
   category,
   preservedBy,
   conversationId,
-  anthropic,
 }) {
   const existing = conversationId ? conversations.get(conversationId) : null;
   const id = conversationId || crypto.randomUUID();
-  const result = await graph.invoke(
-    {
-      conversationId: id,
-      message: message || "",
-      image: image || "",
-      category: category || "",
-      preservedBy: preservedBy || { name: "", story: "" },
-      priorHint: existing?.skillHint || "",
-    },
-    { configurable: { anthropic } },
-  );
+  const result = await graph.invoke({
+    conversationId: id,
+    message: message || "",
+    image: image || "",
+    category: category || "",
+    preservedBy: preservedBy || { name: "", story: "" },
+    priorHint: existing?.skillHint || "",
+  });
 
   conversations.set(id, {
     skillHint: result.skillHint || existing?.skillHint || "",

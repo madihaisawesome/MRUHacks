@@ -1,3 +1,4 @@
+import { completeJson, parseJsonText } from "./llm.js";
 import { mockGeneratedLesson, normalizeGeneratedLesson, saveLesson } from "./lessons.js";
 
 export function generateLessonPrompt(text, category) {
@@ -22,15 +23,9 @@ export function generateLessonPrompt(text, category) {
 }
 
 export function parseJsonFence(response) {
+  if (typeof response === "string") return parseJsonText(response);
   const text = response.content?.find((block) => block.type === "text")?.text;
-  if (!text) throw new Error("The model returned no text.");
-  const cleaned = text
-    .trim()
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
-  return JSON.parse(cleaned);
+  return parseJsonText(text);
 }
 
 export function mockLessonFromRequest(skillHint, instructions = "", extras = {}) {
@@ -91,7 +86,6 @@ export async function generateAndSaveLesson({
   text,
   preservedBy,
   category,
-  anthropic,
 }) {
   const hasImage = typeof image === "string" && image.trim();
   const hasText = typeof text === "string" && text.trim();
@@ -113,25 +107,14 @@ export async function generateAndSaveLesson({
     return saveLesson(lesson);
   }
 
-  if (!anthropic) throw new Error("ANTHROPIC_API_KEY is not configured.");
-  const content = [];
-  if (hasImage) {
-    content.push({
-      type: "image",
-      source: { type: "base64", media_type: "image/jpeg", data: image.trim() },
-    });
-  }
-  content.push({ type: "text", text: generateLessonPrompt(hasText ? text.trim() : "", category) });
-
   let lastError;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-5-5",
-        max_tokens: 2000,
-        messages: [{ role: "user", content }],
+      const parsed = await completeJson({
+        prompt: generateLessonPrompt(hasText ? text.trim() : "", category),
+        image: hasImage ? image.trim() : undefined,
+        maxTokens: 2000,
       });
-      const parsed = parseJsonFence(response);
       return saveLesson(normalizeGeneratedLesson(parsed, { preservedBy, category }));
     } catch (error) {
       if (error.refused) throw error;

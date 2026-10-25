@@ -8,13 +8,15 @@ lesson progression and keeps sessions in memory.
 ```powershell
 npm install
 Copy-Item .env.example .env
-# Set ANTHROPIC_API_KEY in .env, then:
+# Set OPENAI_API_KEY (or ANTHROPIC_API_KEY) in server/.env, then:
 npm start
 ```
 
 The server listens on port `3001`. Clients can use `http://localhost:3001`.
 
-Set `MOCK_MODE=true` in `.env` to test without API calls. Mock `/check` results
+Set `OPENAI_API_KEY` in `server/.env` and `MOCK_MODE=false` to use your OpenAI key
+(gpt-4o by default). Anthropic still works if `OPENAI_API_KEY` is empty and
+`ANTHROPIC_API_KEY` is set. Set `MOCK_MODE=true` to test without API calls. Mock `/check` results
 alternate between failure and success (1.5s). Mock `/generate-lesson` returns
 a hardcoded **Grandma's flatbread** lesson after 2 seconds.
 

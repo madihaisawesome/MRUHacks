@@ -3,7 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import Anthropic from "@anthropic-ai/sdk";
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
@@ -11,6 +10,7 @@ import express from "express";
 import { sessions } from "./sessions.js";
 import { runCreateSkillGraph } from "./createSkillGraph.js";
 import { generateAndSaveLesson } from "./generateLesson.js";
+import { completeJson, llmProvider } from "./llm.js";
 import {
   getLesson,
   listLessonSummaries,
@@ -26,9 +26,6 @@ const app = express();
 const port = Number(process.env.PORT || 3001);
 const rateLimitTimes = new Map();
 const mockChecks = new Map();
-const anthropic = process.env.ANTHROPIC_API_KEY
-  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  : null;
 
 app.use(cors());
 app.use(express.json({ limit: "15mb" }));
@@ -134,28 +131,8 @@ function modelPrompt(skill, step) {
   ].join("\n");
 }
 
-function parseModelResponse(response) {
-  const text = response.content?.find((block) => block.type === "text")?.text;
-  if (!text) throw new Error("The model returned no text.");
-  const cleaned = text
-    .trim()
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
-  const result = JSON.parse(cleaned);
-  if (
-    typeof result.visible !== "boolean" ||
-    typeof result.criteria_met !== "boolean" ||
-    typeof result.feedback !== "string"
-  ) {
-    throw new Error("The model returned an invalid assessment.");
-  }
-  return result;
-}
-
 async function assessImage(image, skill, step, sessionId) {
-  if (process.env.MOCK_MODE === "true") {
+  if (llmProvider() === "mock") {
     await new Promise((resolve) => setTimeout(resolve, 1500));
     const count = (mockChecks.get(sessionId) || 0) + 1;
     mockChecks.set(sessionId, count);
@@ -169,25 +146,22 @@ async function assessImage(image, skill, step, sessionId) {
     };
   }
 
-  if (!anthropic) throw new Error("ANTHROPIC_API_KEY is not configured.");
-  const request = {
-    model: "claude-sonnet-5-5",
-    max_tokens: 600,
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: image } },
-          { type: "text", text: modelPrompt(skill, step) },
-        ],
-      },
-    ],
-  };
-
   let lastError;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      return parseModelResponse(await anthropic.messages.create(request));
+      const result = await completeJson({
+        prompt: modelPrompt(skill, step),
+        image,
+        maxTokens: 600,
+      });
+      if (
+        typeof result.visible !== "boolean" ||
+        typeof result.criteria_met !== "boolean" ||
+        typeof result.feedback !== "string"
+      ) {
+        throw new Error("The model returned an invalid assessment.");
+      }
+      return result;
     } catch (error) {
       lastError = error;
     }
@@ -195,7 +169,7 @@ async function assessImage(image, skill, step, sessionId) {
   throw new Error(`Unable to parse the model response: ${lastError.message}`);
 }
 
-app.get("/health", (_req, res) => res.json({ ok: true }));
+app.get("/health", (_req, res) => res.json({ ok: true, provider: llmProvider() }));
 
 app.get("/skills", (_req, res) => {
   res.json({
@@ -280,12 +254,11 @@ app.post("/generate-lesson", async (req, res) => {
   }
 
   try {
-    const lesson = await generateAndSaveLesson({
+                const lesson = await generateAndSaveLesson({
       image,
       text,
       preservedBy,
       category,
-      anthropic,
     });
     return res.json(lesson);
   } catch (error) {
@@ -310,7 +283,6 @@ app.post("/create-skill", async (req, res) => {
       preservedBy,
       category,
       conversationId,
-      anthropic,
     });
     const status = result.status === "refused" ? 422 : result.status === "error" ? 500 : 200;
     return res.status(status).json(result);
