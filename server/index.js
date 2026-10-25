@@ -9,25 +9,19 @@ import dotenv from "dotenv";
 import express from "express";
 
 import { sessions } from "./sessions.js";
-
-dotenv.config();
+import {
+  getLesson,
+  listLessonSummaries,
+  mockGeneratedLesson,
+  normalizeGeneratedLesson,
+  saveLesson,
+} from "./lessons.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, ".env") });
+dotenv.config();
 const catalog = JSON.parse(
   fs.readFileSync(path.join(__dirname, "curriculum.json"), "utf8"),
-);
-const skillsById = new Map(
-  catalog.categories.flatMap((category) =>
-    category.skills.map((skill) => [
-      skill.id,
-      {
-        ...skill,
-        categoryId: category.id,
-        categoryName: category.name,
-        persona: skill.persona || catalog.persona,
-      },
-    ]),
-  ),
 );
 const app = express();
 const port = Number(process.env.PORT || 3001);
@@ -37,31 +31,31 @@ const anthropic = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   : null;
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (
-        !origin ||
-        origin === "http://localhost:5173" ||
-        origin === "http://127.0.0.1:5173"
-      ) {
-        callback(null, true);
-        return;
-      }
-      callback(new Error("Origin is not allowed by CORS."));
-    },
-  }),
-);
-app.use(express.json({ limit: "10mb" }));
+app.use(cors());
+app.use(express.json({ limit: "15mb" }));
 
 function publicStep(step) {
   return step
-    ? { id: step.id, title: step.title, instruction: step.instruction }
+    ? {
+        id: step.id,
+        title: step.title,
+        instruction: step.instruction,
+        verifiable: step.verifiable !== false,
+      }
     : null;
 }
 
-function getSkill(skillId) {
-  return skillsById.get(skillId || catalog.defaultSkillId) || null;
+function lessonAsSkill(lesson) {
+  if (!lesson) return null;
+  return {
+    id: lesson.id,
+    name: lesson.skill,
+    skill: lesson.skill,
+    categoryId: lesson.category,
+    categoryName: lesson.category,
+    persona: lesson.persona,
+    steps: lesson.steps,
+  };
 }
 
 function publicSkill(skill) {
@@ -74,24 +68,46 @@ function publicSkill(skill) {
   };
 }
 
+function resolveLessonId(body = {}) {
+  return body.lessonId || body.skillId || "sew-button";
+}
+
+function getSessionLesson(session) {
+  return getLesson(session.lessonId || session.skillId);
+}
+
 function getSessionSkill(session) {
-  return getSkill(session.skillId);
+  return lessonAsSkill(getSessionLesson(session));
 }
 
 function getSessionStep(session) {
-  const skill = getSessionSkill(session);
-  return skill?.steps.find((step) => step.id === session.currentStep) || null;
+  const lesson = getSessionLesson(session);
+  return lesson?.steps.find((step) => step.id === session.currentStep) || null;
+}
+
+function coachLine(session, feedback, extra = {}) {
+  const step = getSessionStep(session);
+  if (session.completed) {
+    return `${feedback} That's the whole lesson. I'm proud of you.`;
+  }
+  if (extra.advanced && step) {
+    return `${feedback} Next up: ${step.instruction}`;
+  }
+  return feedback;
 }
 
 function sessionResponse(session, feedback, extra = {}) {
   const skill = getSessionSkill(session);
+  const step = publicStep(getSessionStep(session));
   return {
     stepComplete: Boolean(extra.stepComplete),
     advanced: Boolean(extra.advanced),
     completed: session.completed,
     skill: skill ? publicSkill(skill) : null,
-    currentStep: publicStep(getSessionStep(session)),
+    lessonId: session.lessonId || skill?.id || null,
+    currentStep: step,
     feedback,
+    coachLine: coachLine(session, feedback, extra),
     passStreak: session.passStreak,
     attempts: session.attempts,
     totalSteps: skill?.steps.length || 0,
@@ -102,14 +118,18 @@ function sessionResponse(session, feedback, extra = {}) {
 function modelPrompt(skill, step) {
   return [
     `You are ${skill.persona}.`,
-    "Assess the user's current craft work in the image for this step only.",
+    "Look at the learner's webcam photo and coach them through THIS step only.",
+    `Skill: ${skill.name}`,
     `Step title: ${step.title}`,
+    `What they should do: ${step.instruction}`,
     `Success criteria: ${step.success_criteria}`,
     `Common mistakes: ${step.common_mistakes.join(", ")}`,
     "",
-    "Decide whether the success criteria are clearly visible in the image.",
-    "If they are not met, give ONE short, specific, encouraging piece of feedback (maximum 2 sentences), referencing a common mistake where relevant.",
-    'If the image is too dark, blurry, or does not show the work area, say so with "visible": false and ask the user to adjust the camera.',
+    "If the success criteria are clearly visible, set criteria_met true and give a brief warm compliment.",
+    "If they are close but not done, set criteria_met false and tell them the ONE next physical action.",
+    "If they are on the wrong track, gently name the likely mistake and how to fix it.",
+    "Write feedback as if you are speaking out loud: short, specific, encouraging, maximum 2 sentences. No markdown.",
+    'If the image is too dark, blurry, or does not show the work, set visible false and ask them to move the camera.',
     'Return ONLY valid JSON with no preamble and no markdown fences:',
     '{"visible": true, "criteria_met": true|false, "feedback": "..."}',
   ].join("\n");
@@ -145,8 +165,8 @@ async function assessImage(image, skill, step, sessionId) {
       visible: true,
       criteria_met: passed,
       feedback: passed
-        ? "Lovely work—everything needed for this step is clearly visible."
-        : "Take another look and make sure the work area and the key details are clearly visible.",
+        ? `Lovely — ${step.title.toLowerCase()} looks right from here.`
+        : `Not quite yet. ${step.instruction}`,
     };
   }
 
@@ -194,44 +214,197 @@ app.get("/skills", (_req, res) => {
 });
 
 function startSessionPayload(sessionId, skill) {
+  const step = publicStep(skill.steps[0]);
   return {
     sessionId,
+    lessonId: skill.id,
     skill: publicSkill(skill),
     totalSteps: skill.steps.length,
-    step: publicStep(skill.steps[0]),
+    step,
+    coachLine: `I'll walk you through ${skill.name}, one step at a time. ${step.instruction}`,
   };
 }
 
-app.post("/session/start", (req, res) => {
-  const skill = getSkill(req.body?.skillId);
-  if (!skill) return res.status(404).json({ error: "skill not found" });
+function createSession(lesson) {
   const sessionId = crypto.randomUUID();
   sessions.set(sessionId, {
-    skillId: skill.id,
-    currentStep: skill.steps[0].id,
+    lessonId: lesson.id,
+    skillId: lesson.id,
+    currentStep: lesson.steps[0].id,
     attempts: 0,
     passStreak: 0,
     history: [],
     completed: false,
   });
-  res.json(startSessionPayload(sessionId, skill));
-});
+  return sessionId;
+}
 
-app.post("/session/reset", (req, res) => {
-  const { sessionId, skillId } = req.body || {};
-  const session = sessions.get(sessionId);
-  if (!session) return res.status(404).json({ error: "session not found" });
-  const skill = getSkill(skillId || session.skillId);
-  if (!skill) return res.status(404).json({ error: "skill not found" });
-  session.skillId = skill.id;
-  session.currentStep = skill.steps[0].id;
+function resetSessionState(session, lesson) {
+  session.lessonId = lesson.id;
+  session.skillId = lesson.id;
+  session.currentStep = lesson.steps[0].id;
   session.attempts = 0;
   session.passStreak = 0;
   session.history = [];
   session.completed = false;
+}
+
+function selfConfirmFeedback(step) {
+  return `I can't see this part on camera — ${step.success_criteria} Tap confirm when you've done it.`;
+}
+
+function advanceSession(session, lesson, step) {
+  const nextStep = lesson.steps.find((candidate) => candidate.id > step.id);
+  session.passStreak = 0;
+  session.attempts = 0;
+  if (nextStep) session.currentStep = nextStep.id;
+  else session.completed = true;
+  return Boolean(nextStep);
+}
+
+app.get("/lessons", (_req, res) => {
+  res.json(listLessonSummaries());
+});
+
+app.get("/lessons/:id", (req, res) => {
+  const lesson = getLesson(req.params.id);
+  if (!lesson) return res.status(404).json({ error: "lesson not found" });
+  res.json(lesson);
+});
+
+function generateLessonPrompt(text, category) {
+  return [
+    "You are a skill-teaching curriculum designer.",
+    "Read the person's instructions. Transcribe handwriting if an image is provided.",
+    "Stay faithful to their method. Do not invent a different technique or add steps they did not describe, other than splitting a described step into smaller ones.",
+    text ? `Typed or transcribed instructions from the person:\n${text}` : "No typed text was provided; rely on the image.",
+    category ? `Preferred category if it fits: ${category}` : "",
+    "Produce 4 to 8 steps. Each step needs:",
+    "- a short title",
+    "- a one-to-two sentence instruction in plain beginner-friendly language",
+    "- concrete success_criteria describing what a webcam frame would visibly show when the step is done correctly",
+    "- 2 to 3 common_mistakes",
+    'Set "verifiable": false for any step a camera cannot reasonably confirm (taste, smell, waiting time, temperature). For those steps, success_criteria should describe what the user should self-confirm.',
+    "Also suggest skill (title), category, difficulty (beginner|intermediate|advanced), estimatedMinutes, and a materials list.",
+    "If the content is unsafe to teach as a casual activity (hazardous chemicals, mains electrical work, or firearms), return ONLY {\"refused\": true, \"reason\": \"...\"}.",
+    "Return ONLY valid JSON with no preamble and no markdown fences, matching this shape (without id, createdAt, or persona):",
+    '{"skill":"...","category":"...","difficulty":"beginner","estimatedMinutes":10,"materials":["..."],"steps":[{"title":"...","instruction":"...","success_criteria":"...","common_mistakes":["...","..."],"verifiable":true}]}',
+  ].filter(Boolean).join("\n");
+}
+
+function parseJsonFence(response) {
+  const text = response.content?.find((block) => block.type === "text")?.text;
+  if (!text) throw new Error("The model returned no text.");
+  const cleaned = text
+    .trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  return JSON.parse(cleaned);
+}
+
+app.post("/generate-lesson", async (req, res) => {
+  const { image, text, preservedBy, category } = req.body || {};
+  const hasImage = typeof image === "string" && image.trim();
+  const hasText = typeof text === "string" && text.trim();
+  if (!hasImage && !hasText) {
+    return res.status(400).json({ error: "image or text is required" });
+  }
+
+  try {
+    if (process.env.MOCK_MODE === "true") {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const lesson = mockGeneratedLesson();
+      if (preservedBy && typeof preservedBy === "object") {
+        lesson.preservedBy = {
+          name: String(preservedBy.name || "").slice(0, 80),
+          story: String(preservedBy.story || "").slice(0, 400),
+        };
+      }
+      if (category) lesson.category = String(category).slice(0, 80);
+      return res.json(saveLesson(lesson));
+    }
+
+    if (!anthropic) throw new Error("ANTHROPIC_API_KEY is not configured.");
+    const content = [];
+    if (hasImage) {
+      content.push({
+        type: "image",
+        source: { type: "base64", media_type: "image/jpeg", data: image.trim() },
+      });
+    }
+    content.push({ type: "text", text: generateLessonPrompt(hasText ? text.trim() : "", category) });
+
+    let lastError;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const response = await anthropic.messages.create({
+          model: "claude-sonnet-5-5",
+          max_tokens: 2000,
+          messages: [{ role: "user", content }],
+        });
+        const parsed = parseJsonFence(response);
+        const lesson = normalizeGeneratedLesson(parsed, { preservedBy, category });
+        return res.json(saveLesson(lesson));
+      } catch (error) {
+        if (error.refused) {
+          return res.status(422).json({ refused: true, reason: error.reason });
+        }
+        lastError = error;
+      }
+    }
+    return res.status(500).json({ error: lastError?.message || "Unable to generate a lesson." });
+  } catch (error) {
+    if (error.refused) {
+      return res.status(422).json({ refused: true, reason: error.reason });
+    }
+    console.error("Lesson generation failed:", error);
+    return res.status(500).json({ error: error.message || "Unable to generate a lesson." });
+  }
+});
+
+app.post("/session/start", (req, res) => {
+  const lesson = getLesson(resolveLessonId(req.body));
+  if (!lesson) return res.status(404).json({ error: "lesson not found" });
+  const sessionId = createSession(lesson);
+  res.json(startSessionPayload(sessionId, lessonAsSkill(lesson)));
+});
+
+app.post("/session/reset", (req, res) => {
+  const { sessionId } = req.body || {};
+  const session = sessions.get(sessionId);
+  if (!session) return res.status(404).json({ error: "session not found" });
+  const lesson = getLesson(resolveLessonId({
+    lessonId: req.body?.lessonId || session.lessonId,
+    skillId: req.body?.skillId,
+  }));
+  if (!lesson) return res.status(404).json({ error: "lesson not found" });
+  resetSessionState(session, lesson);
   rateLimitTimes.delete(sessionId);
   mockChecks.delete(sessionId);
-  res.json(startSessionPayload(sessionId, skill));
+  res.json(startSessionPayload(sessionId, lessonAsSkill(lesson)));
+});
+
+app.post("/session/confirm", (req, res) => {
+  const { sessionId } = req.body || {};
+  const session = sessions.get(sessionId);
+  if (!session) return res.status(404).json({ error: "session not found" });
+  const lesson = getSessionLesson(session);
+  const step = getSessionStep(session);
+  if (!lesson || !step) return res.status(404).json({ error: "current step not found" });
+  if (session.completed) {
+    return res.json(sessionResponse(session, "This lesson is already complete.", { stepComplete: true }));
+  }
+  if (step.verifiable !== false) {
+    return res.status(400).json({ error: "this step must be checked with the camera" });
+  }
+  const advanced = advanceSession(session, lesson, step);
+  return res.json(sessionResponse(session, "Nice — that step is done.", {
+    stepComplete: true,
+    advanced,
+    needsSelfConfirm: false,
+  }));
 });
 
 app.post("/check", async (req, res) => {
@@ -252,9 +425,15 @@ app.post("/check", async (req, res) => {
       return res.json(sessionResponse(session, "This lesson is already complete.", { stepComplete: true }));
     }
 
+    const lesson = getSessionLesson(session);
     const skill = getSessionSkill(session);
     const step = getSessionStep(session);
-    if (!skill || !step) return res.status(404).json({ error: "current step not found" });
+    if (!lesson || !skill || !step) return res.status(404).json({ error: "current step not found" });
+    if (step.verifiable === false) {
+      return res.json(sessionResponse(session, selfConfirmFeedback(step), {
+        needsSelfConfirm: true,
+      }));
+    }
     const assessment = await assessImage(image, skill, step, sessionId);
     session.history.push({
       step: step.id,
@@ -270,18 +449,17 @@ app.post("/check", async (req, res) => {
     if (assessment.criteria_met) {
       session.passStreak += 1;
       if (session.passStreak >= 2) {
-        const stepComplete = true;
-        const nextStep = skill.steps.find((candidate) => candidate.id > step.id);
-        session.passStreak = 0;
-        session.attempts = 0;
-        if (nextStep) session.currentStep = nextStep.id;
-        else session.completed = true;
+        const advanced = advanceSession(session, lesson, step);
         return res.json(sessionResponse(session, assessment.feedback, {
-          stepComplete,
-          advanced: Boolean(nextStep),
+          stepComplete: true,
+          advanced,
         }));
       }
-      return res.json(sessionResponse(session, assessment.feedback, { stepComplete: false }));
+      return res.json(sessionResponse(
+        session,
+        `${assessment.feedback} Hold it there and show me once more so I can be sure.`,
+        { stepComplete: false },
+      ));
     }
 
     session.passStreak = 0;

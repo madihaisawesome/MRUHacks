@@ -18,8 +18,12 @@ the computer's local IPv4 address, such as `http://192.168.1.25:3001`.
 The phone and computer must be on the same Wi-Fi network, and the computer's
 firewall must allow inbound TCP traffic on port `3001`.
 
-Set `MOCK_MODE=true` in `.env` to test without API calls; mock checks alternate
-between failure and success and wait 1.5 seconds.
+Set `MOCK_MODE=true` in `.env` to test without API calls. Mock `/check` results
+alternate between failure and success (1.5s). Mock `/generate-lesson` returns
+a hardcoded **Grandma's flatbread** lesson after 2 seconds.
+
+Put `.env` next to `package.json` or in `server/`. The JSON body limit is 15mb
+so a photo of a handwritten note can be sent with `/generate-lesson`.
 
 > This repository currently contains the Express backend only. Expo Go runs a
 > separate React Native client; it cannot run the Node.js server itself.
@@ -42,18 +46,32 @@ between failure and success and wait 1.5 seconds.
 
 ## API examples
 
-List skills:
+List skills (legacy catalog):
 
 ```powershell
 curl.exe http://localhost:3001/skills
 ```
 
-Start a session (default skill, or pass `"skillId":"knot-a-tie"`):
+List saved lessons:
+
+```powershell
+curl.exe http://localhost:3001/lessons
+```
+
+Generate a lesson from typed instructions (or send `"image"` as raw JPEG base64):
+
+```powershell
+curl.exe -X POST http://localhost:3001/generate-lesson `
+  -H "Content-Type: application/json" `
+  -d "{\"text\":\"Mix flour and water, rest 20 minutes, roll flat, cook in a dry pan.\",\"preservedBy\":{\"name\":\"Grandma\",\"story\":\"Sunday flatbread\"}}"
+```
+
+Start a session (default lesson is `sew-button`, or pass a `lessonId`):
 
 ```powershell
 curl.exe -X POST http://localhost:3001/session/start `
   -H "Content-Type: application/json" `
-  -d "{\"skillId\":\"knot-a-tie\"}"
+  -d "{\"lessonId\":\"sew-button\"}"
 ```
 
 Check a JPEG frame (the image must be raw base64 without a data URL prefix):
@@ -72,8 +90,18 @@ curl.exe -X POST http://localhost:3001/session/reset `
   -d '{"sessionId":"SESSION_ID"}'
 ```
 
+Confirm a step that a camera cannot verify (`verifiable: false`):
+
+```powershell
+curl.exe -X POST http://localhost:3001/session/confirm `
+  -H "Content-Type: application/json" `
+  -d "{\"sessionId\":\"SESSION_ID\"}"
+```
+
 ## Lessons
 
-`GET /skills` lists five categories and ten lessons. `POST /session/start` accepts an optional `skillId`; if it is omitted, the session starts on **Sew a button**.
-
-Replace `server/curriculum.json` to add or edit lessons without changing code.
+`GET /lessons` lists summaries from the lesson library (`server/lessons.json`).
+The library is seeded from `server/curriculum.json` (including **sew-button**)
+plus **Fold a fitted sheet**. `POST /generate-lesson` adds a lesson from a
+photo of a handwritten note and/or typed text. `POST /session/start` accepts
+`lessonId` (default `sew-button`); `skillId` still works as an alias.
