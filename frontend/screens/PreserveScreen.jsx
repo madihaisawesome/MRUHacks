@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { CATEGORIES } from '../data/skills';
 import { useProgress } from '../context/ProgressContext';
 import { Button, Panel } from '../components/UI';
-
-const STORAGE_KEY = 'skill-revival-guides';
+import { generateLesson } from '../api';
 
 export default function PreserveScreen({ onDone }) {
   const { share } = useProgress();
@@ -14,60 +13,67 @@ export default function PreserveScreen({ onDone }) {
   const [story, setStory] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
 
   const ready = title.trim().length > 0 && story.trim().length > 0;
 
-  async function submit(event) {
-    event.preventDefault();
-
+  async function publish() {
     if (!ready || saving) return;
 
     setSaving(true);
     setError('');
-
-    const guide = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      title: title.trim(),
-      cat: category,
-      taughtBy: taughtBy.trim(),
-      story: story.trim(),
-      photo: null,
-      createdAt: new Date().toISOString(),
-    };
+    setStatus('Building a coachable lesson from your notes...');
 
     try {
-      await share(guide);
+      const text = [
+        title.trim(),
+        taughtBy.trim() ? `Taught by: ${taughtBy.trim()}` : '',
+        story.trim(),
+      ]
+        .filter(Boolean)
+        .join('\n\n');
 
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const lesson = await generateLesson({
+        text,
+        category,
+        preservedBy: {
+          name: taughtBy.trim() || 'Community',
+          story: story.trim().slice(0, 400),
+        },
+      });
 
-      if (!stored) {
-        throw new Error('The guide was not found in browser storage.');
-      }
+      setStatus('Saving to your library...');
 
-      const guides = JSON.parse(stored);
-
-      const saved = Array.isArray(guides)
-        && guides.some((item) => item.id === guide.id);
-
-      if (!saved) {
-        throw new Error('The guide could not be verified after saving.');
-      }
+      await share({
+        id: lesson.id,
+        title: lesson.skill || title.trim(),
+        cat: lesson.category || category,
+        taughtBy: taughtBy.trim(),
+        story: story.trim(),
+        lessonId: lesson.id,
+        photo: null,
+      });
 
       setTitle('');
       setCategory(CATEGORIES[0].name);
       setTaughtBy('');
       setStory('');
-
+      setStatus('');
       onDone?.();
     } catch (err) {
       console.error('Error publishing guide:', err);
-
+      setStatus('');
       setError(
-        err.message || 'Could not save your guide. Please try again.'
+        err.message || 'Could not save your guide. Please try again.',
       );
     } finally {
       setSaving(false);
     }
+  }
+
+  function submit(event) {
+    event.preventDefault();
+    publish();
   }
 
   return (
@@ -76,7 +82,7 @@ export default function PreserveScreen({ onDone }) {
 
       <p className="meta">
         Share a skill you learned from your family or community.
-        Keep their knowledge alive!
+        We turn your notes into a webcam-coachable lesson.
       </p>
 
       <form onSubmit={submit}>
@@ -136,6 +142,8 @@ export default function PreserveScreen({ onDone }) {
           required
         />
 
+        {status && <p className="meta">{status}</p>}
+
         {error && (
           <p className="errorText" role="alert">
             {error}
@@ -144,13 +152,15 @@ export default function PreserveScreen({ onDone }) {
 
         <div className="buttonRow">
           <Button
+            type="submit"
             title={
               saving
-                ? 'Saving...'
+                ? 'Publishing...'
                 : 'Publish to Library (+100 XP)'
             }
             variant="green"
             disabled={!ready || saving}
+            onPress={publish}
           />
         </div>
       </form>

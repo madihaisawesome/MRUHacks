@@ -51,7 +51,7 @@ function AppContent() {
             ) : tab === 'skills' ? (
               <MySkillsScreen />
             ) : tab === 'library' ? (
-              <LibraryScreen />
+              <LibraryScreen onOpen={openLesson} />
             ) : (
               <PreserveScreen onDone={() => go('library')} />
             )}

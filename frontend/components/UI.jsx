@@ -23,6 +23,7 @@ export function Button({
   variant = 'blue',
   disabled = false,
   style,
+  type = 'button',
 }) {
   const variantClass =
     variant === 'green'
@@ -33,7 +34,7 @@ export function Button({
 
   return (
     <button
-      type="button"
+      type={type}
       disabled={disabled}
       onClick={onPress}
       className={`button ${variantClass} ${

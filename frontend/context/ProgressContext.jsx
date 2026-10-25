@@ -95,13 +95,14 @@ export function ProgressProvider({ children }) {
     }
 
     const savedGuide = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      id: guide.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       title: guide.title.trim(),
       cat: guide.cat || 'Other',
       taughtBy: guide.taughtBy?.trim() || '',
       story: guide.story.trim(),
       photo: guide.photo || null,
-      createdAt: new Date().toISOString(),
+      lessonId: guide.lessonId || null,
+      createdAt: guide.createdAt || new Date().toISOString(),
     };
 
     try {
