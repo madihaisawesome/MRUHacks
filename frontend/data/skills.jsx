@@ -1,4 +1,3 @@
-
 export const CATEGORIES = [
   { name: 'Clothing and crafts', icon: '🧵' },
   { name: 'Everyday repairs', icon: '🔧' },
