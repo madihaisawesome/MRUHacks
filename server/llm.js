@@ -16,10 +16,26 @@ export function parseJsonText(text) {
 }
 
 export function llmProvider() {
-  if (process.env.MOCK_MODE === "true") return "mock";
-  if (process.env.OPENAI_API_KEY) return "openai";
-  if (process.env.ANTHROPIC_API_KEY) return "anthropic";
+  const mock = String(process.env.MOCK_MODE || "").trim().toLowerCase();
+  if (mock === "true" || mock === "1" || mock === "yes") return "mock";
+
+  const openaiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  if (openaiKey) return "openai";
+
+  const anthropicKey = String(process.env.ANTHROPIC_API_KEY || "").trim();
+  if (anthropicKey) return "anthropic";
+
   return "none";
+}
+
+export function llmStatus() {
+  return {
+    provider: llmProvider(),
+    mockMode: String(process.env.MOCK_MODE || "").trim() || "(unset)",
+    hasOpenAiKey: Boolean(String(process.env.OPENAI_API_KEY || "").trim()),
+    hasAnthropicKey: Boolean(String(process.env.ANTHROPIC_API_KEY || "").trim()),
+    model: process.env.OPENAI_MODEL || "gpt-4o",
+  };
 }
 
 function getOpenAI() {

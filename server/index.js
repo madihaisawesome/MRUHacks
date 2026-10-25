@@ -10,15 +10,16 @@ import express from "express";
 import { sessions } from "./sessions.js";
 import { runCreateSkillGraph } from "./createSkillGraph.js";
 import { generateAndSaveLesson } from "./generateLesson.js";
-import { completeJson, llmProvider } from "./llm.js";
+import { completeJson, llmProvider, llmStatus } from "./llm.js";
 import {
   getLesson,
   listLessonSummaries,
 } from "./lessons.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, ".env") });
-dotenv.config();
+// Prefer server/.env over any shell/OS MOCK_MODE leftovers.
+dotenv.config({ path: path.join(__dirname, ".env"), override: true });
+dotenv.config({ override: false });
 const catalog = JSON.parse(
   fs.readFileSync(path.join(__dirname, "curriculum.json"), "utf8"),
 );
@@ -170,7 +171,7 @@ async function assessImage(image, skill, step, sessionId) {
   throw new Error(`Unable to parse the model response: ${lastError.message}`);
 }
 
-app.get("/health", (_req, res) => res.json({ ok: true, provider: llmProvider() }));
+app.get("/health", (_req, res) => res.json({ ok: true, ...llmStatus() }));
 
 app.get("/skills", (_req, res) => {
   res.json({
